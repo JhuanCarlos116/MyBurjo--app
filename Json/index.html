@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>MYBURJO - Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #fff9ef; color: #1f1b11; }
+        h1, h2 { font-family: 'Plus Jakarta Sans', sans-serif; }
+        #map { height: 250px; width: 100%; z-index: 10; border-bottom: 2px solid #e1d9c8; }
+        .ambient-shadow { box-shadow: 0 4px 20px rgba(31, 27, 17, 0.08); }
+        .card-radius { border-radius: 24px; }
+        .custom-tooltip { background: #ffd700; border: none; font-weight: 700; border-radius: 8px; color: #1f1b11; padding: 4px 8px; }
+    </style>
+</head>
+<body class="antialiased pb-32">
+    <header class="bg-white sticky top-0 z-[100] py-4 shadow-sm flex items-center justify-center gap-2 border-b border-[#f5eddb]">
+        <div class="w-10 h-10 rounded-full bg-[#ffd700] flex items-center justify-center border-2 border-white"><span class="material-symbols-outlined text-[#1f1b11]">soup_kitchen</span></div>
+        <h1 class="font-extrabold text-2xl tracking-tighter text-[#1f1b11]">MYBURJO</h1>
+    </header>
+
+    <div class="px-5 mt-5">
+        <div class="bg-white p-3 rounded-2xl ambient-shadow border border-[#e5dfd3] flex items-center gap-3">
+            <span class="material-symbols-outlined text-[#7e7760]">search</span>
+            <input type="text" id="search-input" placeholder="Cari burjo terdekat..." class="w-full bg-transparent outline-none text-sm font-medium">
+        </div>
+    </div>
+
+    <div id="map" class="mt-5"></div>
+    
+    <main id="daftar-burjo" class="px-5 mt-6 space-y-6">
+        <p class="text-center text-[#7e7760] py-10 animate-pulse italic">Mencari Burjo favoritmu...</p>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t h-20 flex justify-around items-center z-[100] shadow-lg">
+        <div class="text-[#705d00] flex flex-col items-center"><span class="material-symbols-outlined">home</span><div class="w-1 h-1 bg-[#ffd700] rounded-full mt-1"></div></div>
+        <div class="bg-[#ffd700] text-[#1f1b11] w-14 h-14 rounded-full -mt-10 flex items-center justify-center shadow-lg border-4 border-white"><span class="material-symbols-outlined">qr_code_scanner</span></div>
+        <div class="text-[#7e7760] flex flex-col items-center"><span class="material-symbols-outlined">person</span></div>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", projectId: "myburjo", appId: "1:25464436577:web:89a3105315f8fbcc703720" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        const map = L.map('map', { zoomControl: false }).setView([-7.051, 110.438], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        const markerGroup = L.layerGroup().addTo(map);
+
+        let userPos = null, lastSnap = null, term = "";
+
+        function hitungJarak(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2-lat1) * Math.PI/180;
+            const dLon = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(2);
+        }
+
+        window.fokusPeta = (lat, lng) => {
+            map.flyTo([lat, lng], 18, { animate: true, duration: 1.5 });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        function getStatus(mejaTerpakai) {
+            const terpakai = parseInt(mejaTerpakai);
+            const tersedia = 10 - terpakai;
+            const persen = (terpakai / 10) * 100;
+            let config = { tableText: `${tersedia}/10 TERSEDIA`, crowdText: "", style: "" };
+            
+            if (persen <= 25) { config.crowdText = "SEPI"; config.style = "bg-[#e8f5e9] text-[#2e7d32] border-[#c8e6c9]"; }
+            else if (persen <= 75) { config.crowdText = "LUMAYAN"; config.style = "bg-[#fffde7] text-[#f57f17] border-[#fff9c4]"; }
+            else { config.crowdText = "RAME"; config.style = "bg-[#ffebee] text-[#c62828] border-[#ffcdd2]"; }
+            
+            return config;
+        }
+
+        function render(snap, s = "") {
+            const container = document.getElementById('daftar-burjo');
+            container.innerHTML = "";
+            markerGroup.clearLayers();
+
+            snap.forEach(doc => {
+                const d = doc.data();
+                if (s && !d.nama_burjo.toLowerCase().includes(s.toLowerCase())) return;
+
+                const st = getStatus(d.status_meja);
+                const lat = d.lokasi.latitude, lng = d.lokasi.longitude;
+                const jarak = userPos ? hitungJarak(userPos.lat, userPos.lng, lat, lng) : "--";
+                
+                L.circleMarker([lat, lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
+                 .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
+
+                container.innerHTML += `
+                    <div class="bg-white card-radius p-5 ambient-shadow border border-[#f5eddb] flex flex-col gap-4 relative">
+                        <div class="flex justify-between items-start">
+                            <div class="flex gap-4">
+                                <div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6]"><span class="material-symbols-outlined text-3xl">soup_kitchen</span></div>
+                                <div>
+                                    <h2 class="font-bold text-xl text-[#1f1b11]">${d.nama_burjo}</h2>
+                                    <p class="text-xs text-[#7e7760] mt-1 font-semibold italic">📍 ${jarak} km dari kamu</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="fokusPeta(${lat}, ${lng})" class="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-50 text-[#705d00] border border-orange-100 shadow-sm active:scale-95 transition-all"><span class="material-symbols-outlined">location_on</span></button>
+                                
+                                <div class="flex flex-col items-center border p-2 rounded-xl min-w-[100px] ${st.style} shadow-sm">
+                                    <span class="text-[9px] font-extrabold tracking-tighter">${st.tableText}</span>
+                                    <div class="w-full h-[1px] bg-current opacity-20 my-1"></div>
+                                    <span class="text-[10px] font-black">${st.crowdText}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="menu.html?id=${doc.id}" class="w-full bg-[#ffd700] text-[#1f1b11] py-4 rounded-2xl font-bold text-center shadow-md active:scale-95 transition-all">Lihat Menu & Meja</a>
+                    </div>`;
+            });
+        }
+
+        onSnapshot(collection(db, "penjual"), s => { lastSnap = s; render(s, term); });
+        navigator.geolocation.getCurrentPosition(p => { 
+            userPos = { lat: p.coords.latitude, lng: p.coords.longitude }; 
+            L.marker([userPos.lat, userPos.lng], {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/1673/1673188.png', iconSize: [30, 30]})}).addTo(map);
+            if(lastSnap) render(lastSnap, term); 
+        });
+        document.getElementById('search-input').addEventListener('input', e => { term = e.target.value; render(lastSnap, term); });
+    </script>
+</body>
+</html>
