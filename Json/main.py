@@ -25,84 +25,80 @@ desc_desi = [
 desc_pa_weka = [
     "Meja 1: Dekat kasir, gampang kalau mau nambah pesanan.",
     "Meja 2: Meja tengah dengan akses stop kontak di dinding.",
-    "Meja 3: Area lesehan depan, sirkulasi udara segar.",
-    "Meja 4: Dekat dispenser, gampang ambil minum.",
-    "Meja 5: Meja kayu besar buat kumpul organisasi.",
-    "Meja 6: Pojok adem dengan fasilitas kipas angin sendiri.",
-    "Meja 7: Dekat jendela, pemandangan ke arah jalan.",
-    "Meja 8: Lesehan pojok dalam, nyaman buat santai.",
-    "Me_ja 9: Dekat rak koran, cocok buat makan sambil baca.",
-    "Meja 10: Dekat tempat cuci tangan (wastafel)."
+    "Meja 3: Area lesehan depan, sirkulasi udara bagus.",
+    "Meja 4: Meja panjang, bisa untuk kelompok belajar.",
+    "Meja 5: Pojok ruangan, tempat favorit buat nugas.",
+    "Meja 6: Dekat jendela, pencahayaan alami terang.",
+    "Meja 7: Meja bundar kecil, cocok untuk berdua.",
+    "Meja 8: Area agak masuk ke dalam, lebih tenang.",
+    "Meja 9: Dekat area dapur, wangi makanan bikin laper.",
+    "Meja 10: Lesehan luas di bagian belakang."
 ]
 
 desc_mpo_lines = [
-    "Meja 1: Area depan banget, cocok buat yang buru-buru.",
-    "Meja 2: Tengah ruangan, dekat dengan tempat kerupuk.",
-    "Me_ja 3: Pojok kanan, ada colokan listrik tersembunyi.",
-    "Meja 4: Area lesehan paling belakang, sangat tenang.",
-    "Meja 5: Meja bundar unik, asik buat ngobrol melingkar.",
-    "Meja 6: Dekat rak gorengan, tinggal comot (jangan lupa bayar).",
-    "Meja 7: Lesehan dinding, sandarannya empuk.",
-    "Meja 8: Meja standar dekat kipas angin dinding.",
-    "Meja 9: Dekat speaker musik, suasananya asik.",
-    "Meja 10: Dekat pintu dapur, aroma masakan menggoda."
+    "Meja 1: Meja paling depan, bisa lihat jalanan.",
+    "Meja 2: Dekat meja kasir.",
+    "Meja 3: Meja standar kapasitas 4 orang.",
+    "Meja 4: Lesehan nyaman dengan bantal duduk.",
+    "Meja 5: Meja kayu jati tebal.",
+    "Meja 6: Area tengah yang cukup luas.",
+    "Meja 7: Dekat colokan listrik.",
+    "Meja 8: Pojokan yang nyaman.",
+    "Meja 9: Meja untuk rombongan besar.",
+    "Meja 10: Area khusus yang lebih privat."
 ]
 
 desc_ma_sin = [
-    "Meja 1: Dekat pintu masuk, sirkulasi udara paling mantap.",
-    "Meja 2: Meja standar dengan stop kontak di bawah meja.",
-    "Meja 3: Meja tengah, posisi paling strategis.",
-    "Meja 4: Dekat pantry, bisa liat proses masak Indomie.",
-    "Meja 5: Meja pojok dengan pencahayaan warm putih.",
-    "Meja 6: Tepat di depan TV besar, pas jadwal bola.",
-    "Meja 7: Lesehan samping, suasana kayu yang hangat.",
-    "Meja 8: Lesehan belakang, area khusus dilarang merokok.",
-    "Meja 9: Meja kecil, pas banget buat yang makan sendirian.",
-    "Meja 10: Pojok paling adem, kipas anginnya kenceng."
+    "Meja 1: Meja dekat pintu.",
+    "Meja 2: Lesehan dekat jendela.",
+    "Meja 3: Meja tengah.",
+    "Meja 4: Meja dengan kursi sofa.",
+    "Meja 5: Area favorit pengunjung.",
+    "Meja 6: Dekat rak majalah/buku.",
+    "Meja 7: Meja panjang.",
+    "Meja 8: Lesehan belakang.",
+    "Meja 9: Meja paling terang.",
+    "Meja 10: Pojok sepi."
 ]
 
-# --- DATA PENJUAL UTUH ---
+# --- DAFTAR DATA PENJUAL ---
 data_penjual = [
     {
         "id": "12052601", "nama": "Burjo Desi", "meja": "2", 
-        "desc": desc_desi, "lat": -7.0517063, "lng": 110.4403961
+        "pin": "1234", 
+        "desc": desc_desi, "lat": -7.052062, "lng": 110.437145
     },
     {
-        "id": "12052602", "nama": "Burjo Pa Weka", "meja": "6", 
+        "id": "12052602", "nama": "Burjo Pa Weka", "meja": "5", 
+        "pin": "6339", 
         "desc": desc_pa_weka, "lat": -7.0512984, "lng": 110.4391414
     },
     {
         "id": "12052603", "nama": "Burjo Mpo Lines", "meja": "1", 
+        "pin": "", 
         "desc": desc_mpo_lines, "lat": -7.0518414, "lng": 110.4337752
     },
     {
         "id": "12052604", "nama": "Burjo Ma Sin", "meja": "9", 
+        "pin": "1111", 
         "desc": desc_ma_sin, "lat": -7.0502177, "lng": 110.4417592
     }
 ]
 
 def update_database():
-    print("⏳ Menghapus data lama dan mengunggah data baru...")
+    print("⏳ Sedang menyinkronkan data ke Firebase...")
     for p in data_penjual:
         doc_ref = db.collection('penjual').document(p['id'])
         
-        # Simpan Data Utama
         doc_ref.set({
             "nama_burjo": p['nama'],
             "status_meja": p['meja'],
             "deskripsi_meja": p['desc'],
-            "lokasi": firestore.GeoPoint(p['lat'], p['lng'])
-        })
+            "lokasi": firestore.GeoPoint(p['lat'], p['lng']),
+            "pin": str(p['pin'])
+        }, merge=True)
         
-        # Reset & Simpan Menu (Opsional jika ingin update menu juga)
-        menu_ref = doc_ref.collection('katalog_menu')
-        for m_old in menu_ref.list_documents(): m_old.delete()
-        
-        menu_ref.add({"nama": "Nasi Ayam Bali", "harga": 15000, "kategori": "Makanan", "is_active": True})
-        menu_ref.add({"nama": "Indomie Tante", "harga": 10000, "kategori": "Makanan", "is_active": True})
-        menu_ref.add({"nama": "Es Teh Manis", "harga": 4000, "kategori": "Minuman", "is_active": True})
-        menu_ref.add({"nama": "Kopi Susu", "harga": 5000, "kategori": "Minuman", "is_active": True})
+    print("✅ Selesai! Data dan PIN sekarang sudah tersimpan di Firebase.")
 
-    print("✅ Database MyBurjo SIAP! Semua deskripsi meja sudah unik.")
-
-update_database()
+if __name__ == "__main__":
+    update_database()
