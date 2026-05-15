@@ -54,7 +54,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // KUNCI FIREBASE ASLIMU SUDAH SAYA MASUKKAN DI SINI:
         const firebaseConfig = { 
             apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
             projectId: "myburjo", 
@@ -112,7 +111,8 @@
                 await updateDoc(doc(db, "penjual", activeId), { pin: p1 });
                 alert("PIN Berhasil Dibuat!");
                 localStorage.setItem("myburjo_penjual_id", activeId);
-                window.location.href = "utama-penjual.html";
+                // INTEGRASI: Pindah ke file dashboard yang sudah kita buat tadi
+                window.location.href = "laman-utama-penjual.html?id=" + activeId;
             } catch (e) {
                 alert("Gagal menyimpan PIN!");
             }
@@ -124,7 +124,8 @@
 
             if(inputPin === pinDb) {
                 localStorage.setItem("myburjo_penjual_id", activeId);
-                window.location.href = "utama-penjual.html";
+                // INTEGRASI: Pindah ke file dashboard yang sudah kita buat tadi
+                window.location.href = "laman-utama-penjual.html?id=" + activeId;
             } else {
                 alert("PIN Salah! Silakan coba lagi.");
                 document.getElementById('pin-input').value = "";
