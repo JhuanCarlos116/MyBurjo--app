@@ -9,8 +9,8 @@
     <style>
         body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #fff9ef; }
         .tab-active { background-color: white; color: #705d00; font-weight: 600; box-shadow: 0 4px 15px rgba(31, 27, 17, 0.06); }
-        .meja-box { transition: all 0.2s ease; cursor: pointer; }
-        .meja-selected { transform: scale(1.1); border: 3px solid #705d00 !important; }
+        .meja-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .meja-selected { transform: scale(1.1); border: 3px solid #705d00 !important; z-index: 10; }
     </style>
 </head>
 <body class="pb-40">
@@ -23,7 +23,7 @@
     <main class="p-5 space-y-8 text-center">
         <div class="flex justify-center">
             <span id="status-pill" class="inline-flex items-center px-6 py-2.5 rounded-full font-bold text-sm bg-white border border-[#f5eddb] shadow-sm uppercase tracking-wide text-[#705d00]">
-                <span id="text-status">--/10 MEJA TERSEDIA</span>
+                <span id="text-status">MENUNGGU DATA...</span>
             </span>
         </div>
 
@@ -38,7 +38,7 @@
             
             <div id="grid-meja" class="grid grid-cols-5 gap-3"></div>
 
-            <div id="box-fasilitas" class="bg-[#fff9ef] p-5 rounded-2xl text-left border-2 border-dashed border-[#f5eddb] transition-all duration-300">
+            <div id="box-fasilitas" class="bg-[#fff9ef] p-5 rounded-2xl text-left border-2 border-dashed border-[#f5eddb]">
                 <p class="text-[10px] font-black text-[#705d00] uppercase mb-1 tracking-tighter">Informasi Fasilitas Meja:</p>
                 <p id="deskripsi-meja" class="text-sm text-[#1f1b11] font-medium leading-relaxed">Silakan klik salah satu kotak nomor meja di atas.</p>
             </div>
@@ -59,13 +59,27 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        const firebaseConfig = { apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", projectId: "myburjo", appId: "1:25464436577:web:89a3105315f8fbcc703720" };
-        const app = initializeApp(firebaseConfig), db = getFirestore(app), burjoId = new URLSearchParams(window.location.search).get('id');
-        let allMenu = [], listDeskripsi = [];
+        import { getFirestore, doc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = { 
+            apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
+            projectId: "myburjo", 
+            appId: "1:25464436577:web:89a3105315f8fbcc703720" 
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const burjoId = new URLSearchParams(window.location.search).get('id') || "12052601";
+        
+        let allMenu = [];
+        let listDeskripsi = [];
 
         window.pilihMeja = (index) => {
-            document.getElementById('deskripsi-meja').innerText = listDeskripsi[index] || "Informasi meja tidak tersedia.";
+            const rawText = listDeskripsi[index] || "Informasi meja tidak tersedia.";
+            // Membersihkan teks jika formatnya "Meja X: Muat Y Orang, Deskripsi"
+            const cleanText = rawText.includes(':') ? rawText.split(', ')[1] || rawText : rawText;
+            document.getElementById('deskripsi-meja').innerText = cleanText;
+            
             document.querySelectorAll('.meja-box').forEach(el => el.classList.remove('meja-selected'));
             document.getElementById(`meja-${index}`).classList.add('meja-selected');
         };
@@ -77,7 +91,8 @@
         };
 
         function renderMenu(k) {
-            const c = document.getElementById('daftar-menu'); c.innerHTML = "";
+            const c = document.getElementById('daftar-menu'); 
+            c.innerHTML = "";
             allMenu.filter(m => m.kategori === k).forEach(item => {
                 c.innerHTML += `
                     <div class="bg-white p-4 rounded-[24px] flex gap-4 items-center shadow-sm border border-[#f5eddb]">
@@ -92,22 +107,55 @@
             });
         }
 
-        async function load() {
-            const s = await getDoc(doc(db, "penjual", burjoId)); if(!s.exists()) return;
-            const d = s.data(); document.getElementById('nama-burjo').innerText = d.nama_burjo;
-            listDeskripsi = d.deskripsi_meja || [];
-            const terpakai = parseInt(d.status_meja);
-            document.getElementById('text-status').innerText = `${10 - terpakai}/10 MEJA TERSEDIA`;
-            document.getElementById('btn-gas').onclick = () => window.open(`http://www.google.com/maps/dir/?api=1&destination=${d.lokasi.latitude},${d.lokasi.longitude}`, '_blank');
-            const grid = document.getElementById('grid-meja');
-            for(let i=0; i<10; i++) {
-                const isTerpakai = i < terpakai;
-                grid.innerHTML += `<div id="meja-${i}" onclick="pilihMeja(${i})" class="meja-box aspect-square flex items-center justify-center rounded-xl font-bold text-xs ${isTerpakai ? 'bg-[#f5eddb] text-[#e1d9c8]' : 'bg-[#ffd700] text-[#1f1b11] shadow-sm'}">${i+1}</div>`;
-            }
-            const mSnap = await getDocs(collection(db, "penjual", burjoId, "katalog_menu"));
-            mSnap.forEach(m => allMenu.push(m.data())); renderMenu('Makanan');
+        // FUNGSI REAL-TIME INTEGRATION
+        function initRealtime() {
+            const docRef = doc(db, "penjual", burjoId);
+            
+            // Mendengarkan perubahan data secara Real-time
+            onSnapshot(docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    document.getElementById('nama-burjo').innerText = data.nama_burjo;
+                    listDeskripsi = data.deskripsi_meja || [];
+                    
+                    // Ambil list meja yang diisi penjual (meja_aktif adalah array nomor meja)
+                    const mejaAktif = data.meja_aktif || [];
+                    const tersedia = 10 - mejaAktif.length;
+                    
+                    document.getElementById('text-status').innerText = `${tersedia}/10 MEJA TERSEDIA`;
+                    
+                    // Update Peta
+                    if(data.lokasi) {
+                        document.getElementById('btn-gas').onclick = () => window.open(`https://www.google.com/maps?q=${data.lokasi.latitude},${data.lokasi.longitude}`, '_blank');
+                    }
+
+                    // Render Grid Meja secara dinamis sesuai data meja_aktif
+                    const grid = document.getElementById('grid-meja');
+                    grid.innerHTML = "";
+                    for(let i = 1; i <= 10; i++) {
+                        const isTerpakai = mejaAktif.includes(i.toString()) || mejaAktif.includes(i);
+                        grid.innerHTML += `
+                            <div id="meja-${i-1}" onclick="pilihMeja(${i-1})" 
+                                 class="meja-box aspect-square flex items-center justify-center rounded-xl font-bold text-xs shadow-sm
+                                 ${isTerpakai ? 'bg-[#f5eddb] text-[#e1d9c8] pointer-events-none' : 'bg-[#ffd700] text-[#1f1b11]'}">
+                                 ${i}
+                            </div>`;
+                    }
+                }
+            });
         }
-        load();
+
+        // Load Menu Sekali Saja (Menu jarang berubah dibanding status meja)
+        async function loadMenu() {
+            const mSnap = await getDocs(collection(db, "penjual", burjoId, "katalog_menu"));
+            allMenu = [];
+            mSnap.forEach(m => allMenu.push(m.data())); 
+            renderMenu('Makanan');
+        }
+
+        // Jalankan Semuanya
+        initRealtime();
+        loadMenu();
     </script>
 </body>
 </html>
