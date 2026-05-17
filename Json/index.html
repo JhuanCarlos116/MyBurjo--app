@@ -36,15 +36,22 @@
         <p class="text-center text-[#7e7760] py-10 animate-pulse italic">Mencari Burjo favoritmu...</p>
     </main>
 
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t h-20 flex justify-around items-center z-[100] shadow-lg">
-        <div class="text-[#705d00] flex flex-col items-center"><span class="material-symbols-outlined">home</span><div class="w-1 h-1 bg-[#ffd700] rounded-full mt-1"></div></div>
-        <a href="scan.html" class="bg-[#ffd700] text-[#1f1b11] w-14 h-14 rounded-full -mt-10 flex items-center justify-center shadow-lg border-4 border-white cursor-pointer active:scale-95">
-    <span class="material-symbols-outlined">qr_code_scanner</span>
-</a>
-        <a href="profile.html" class="text-[#7e7760] flex flex-col items-center active:scale-95 transition-all">
-    <span class="material-symbols-outlined">person</span>
-</a>
-    </nav>
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t py-2 flex justify-around items-center z-[100] shadow-lg">
+        <a href="index.html" class="text-[#705d00] flex flex-col items-center gap-0.5 active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-2xl">home</span>
+            <span class="text-[10px] font-bold">Laman Utama</span>
+        </a>
+        <a href="scan.html" class="flex flex-col items-center gap-0.5 active:scale-95 transition-all relative">
+            <div class="bg-[#ffd700] text-[#1f1b11] w-12 h-12 rounded-full -mt-6 flex items-center justify-center shadow-md border-4 border-white">
+                <span class="material-symbols-outlined text-xl">qr_code_scanner</span>
+            </div>
+            <span class="text-[10px] font-bold text-[#7e7760] mt-1">QR</span>
+        </a>
+        <a href="profile.html" class="text-[#7e7760] flex flex-col items-center gap-0.5 active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-2xl">person</span>
+            <span class="text-[10px] font-bold">Profil</span>
+        </a>
+        </nav>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -73,11 +80,11 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        function getStatus(mejaTerpakai) {
-            const terpakai = parseInt(mejaTerpakai);
-            const tersedia = 10 - terpakai;
-            const persen = (terpakai / 10) * 100;
-            let config = { tableText: `${tersedia}/10 TERSEDIA`, crowdText: "", style: "" };
+        function getStatus(mejaTerpakai, totalMeja = 10) {
+            const terpakai = parseInt(mejaTerpakai) || 0;
+            const tersedia = totalMeja - terpakai;
+            const persen = totalMeja > 0 ? (terpakai / totalMeja) * 100 : 0;
+            let config = { tableText: `${tersedia}/${totalMeja} TERSEDIA`, crowdText: "", style: "" };
             
             if (persen <= 25) { config.crowdText = "SEPI"; config.style = "bg-[#e8f5e9] text-[#2e7d32] border-[#c8e6c9]"; }
             else if (persen <= 75) { config.crowdText = "LUMAYAN"; config.style = "bg-[#fffde7] text-[#f57f17] border-[#fff9c4]"; }
@@ -95,10 +102,15 @@
                 const d = doc.data();
                 if (s && !d.nama_burjo.toLowerCase().includes(s.toLowerCase())) return;
 
-                const st = getStatus(d.status_meja);
+                // Hitung total meja secara dinamis berdasarkan jumlah deskripsi_meja di database
+                const totalMeja = d.deskripsi_meja ? d.deskripsi_meja.length : 10;
+                const st = getStatus(d.status_meja, totalMeja);
                 const lat = d.lokasi.latitude, lng = d.lokasi.longitude;
                 const jarak = userPos ? hitungJarak(userPos.lat, userPos.lng, lat, lng) : "--";
                 
+                // Deteksi foto profil kustom dari database
+                const imgProfileUrl = d.foto_profil || '';
+
                 L.circleMarker([lat, lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
                  .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
 
@@ -106,7 +118,9 @@
                     <div class="bg-white card-radius p-5 ambient-shadow border border-[#f5eddb] flex flex-col gap-4 relative">
                         <div class="flex justify-between items-start">
                             <div class="flex gap-4">
-                                <div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6]"><span class="material-symbols-outlined text-3xl">soup_kitchen</span></div>
+                                <div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6] overflow-hidden">
+                                    ${imgProfileUrl ? `<img src="${imgProfileUrl}" alt="${d.nama_burjo}" class="w-full h-full object-cover">` : `<span class="material-symbols-outlined text-3xl">soup_kitchen</span>`}
+                                </div>
                                 <div>
                                     <h2 class="font-bold text-xl text-[#1f1b11]">${d.nama_burjo}</h2>
                                     <p class="text-xs text-[#7e7760] mt-1 font-semibold italic">📍 ${jarak} km dari kamu</p>

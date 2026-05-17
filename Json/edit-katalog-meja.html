@@ -238,8 +238,8 @@
             currentMejaNomor = nomor.toString().padStart(2, '0');
             document.getElementById('qr-subtitle').innerText = `Meja ${currentMejaNomor}`;
 
-            // Format Data QR Unik: MYBURJO-[ID_PENJUAL]-MEJA-[NOMOR]
-            const qrData = `MYBURJO-${burjoId}-MEJA-${nomor}`;
+            // PERBAIKAN: Gunakan currentMejaNomor agar menghasilkan format '01' bukan '1'
+            const qrData = `MYBURJO-${burjoId}-MEJA-${currentMejaNomor}`;
 
             // Resolusi dibesarkan jadi 500x500 agar bagus saat diprint
             currentQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrData)}`;

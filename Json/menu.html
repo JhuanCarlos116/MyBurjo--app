@@ -142,17 +142,21 @@
                     listDeskripsi = data.deskripsi_meja || [];
                     
                     const mejaAktif = data.meja_aktif || [];
-                    const tersedia = 10 - mejaAktif.length;
+                    // SEKARANG DINAMIS: Mengikuti jumlah data di katalog meja
+                    const totalMeja = listDeskripsi.length; 
+                    const tersedia = totalMeja - mejaAktif.length;
                     
-                    document.getElementById('text-status').innerText = `${tersedia}/10 MEJA TERSEDIA`;
+                    document.getElementById('text-status').innerText = `${tersedia}/${totalMeja} MEJA TERSEDIA`;
                     
+                    // Perbaikan Link Google Maps sekalian (ada typo bawaan di filemu)
                     if(data.lokasi) {
-                        document.getElementById('btn-gas').onclick = () => window.open(`http://maps.google.com/?q=${data.lokasi.latitude},${data.lokasi.longitude}`, '_blank');
+                        document.getElementById('btn-gas').onclick = () => window.open(`https://www.google.com/maps/search/?api=1&query=${data.lokasi.latitude},${data.lokasi.longitude}`, '_blank');
                     }
 
                     const grid = document.getElementById('grid-meja');
                     grid.innerHTML = "";
-                    for(let i = 1; i <= 10; i++) {
+                    // Loop dinamis sesuai total meja yang ada di database
+                    for(let i = 1; i <= totalMeja; i++) {
                         const isTerpakai = mejaAktif.includes(i.toString()) || mejaAktif.includes(i);
                         grid.innerHTML += `
                             <div id="meja-${i-1}" onclick="pilihMeja(${i-1})" 

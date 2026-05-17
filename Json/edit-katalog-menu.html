@@ -44,7 +44,11 @@
                 
                 <textarea id="input-deskripsi" placeholder="Deskripsi Singkat (Opsional)" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-sm font-medium focus:outline-none focus:border-[#ffd700] resize-none h-20"></textarea>
                 
-                <input id="input-foto" type="text" placeholder="Link/URL Foto Baru (Bisa Diedit)" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-sm font-medium focus:outline-none focus:border-[#ffd700]">
+                <div class="space-y-1 text-left">
+                    <label class="text-xs font-bold text-[#7e7760] block px-1">Foto Menu (Kamera / Galeri lokal)</label>
+                    <input id="input-foto-file" type="file" accept="image/*" class="w-full bg-[#fff9ef] p-3 rounded-2xl border border-[#f5eddb] text-sm font-medium focus:outline-none focus:border-[#ffd700]">
+                    <input id="input-foto" type="hidden">
+                </div>
                 
                 <div class="relative">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-[#7e7760]">Rp</span>
@@ -196,6 +200,7 @@
             document.getElementById('input-harga').value = "";
             document.getElementById('input-deskripsi').value = "";
             document.getElementById('input-foto').value = "";
+            document.getElementById('input-foto-file').value = "";
         };
 
         window.editMenu = (id) => {
@@ -214,6 +219,26 @@
                 await deleteDoc(doc(db, "penjual", burjoId, "katalog_menu", id)); 
             }
         };
+
+        // Listener untuk konversi gambar lokal ke string Base64 secara realtime
+        document.getElementById('input-foto-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validasi ukuran agar dokumen Firestore tidak overload (Maksimal rekomendasi ~500kb untuk performa)
+                if (file.size > 1024 * 1024) { 
+                    alert("Ukuran foto terlalu besar! Gunakan foto di bawah 1MB.");
+                    this.value = "";
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Isi hidden input dengan hasil konversi base64
+                    document.getElementById('input-foto').value = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
     </script>
 </body>
 </html>
