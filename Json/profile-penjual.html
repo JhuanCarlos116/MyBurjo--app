@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Profil Penjual - MYBURJO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Be+Vietnam+Pro:wght400;600;700&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" />
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #fff9ef; color: #1f1b11; }
+        h1, h2 { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen">
+
+    <header class="bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-[#f5eddb] shadow-sm">
+        <button id="btn-kembali" class="w-10 h-10 flex items-center justify-center rounded-xl bg-[#fff9ef] text-[#1f1b11] active:scale-95 transition-all">
+            <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h1 class="font-extrabold text-lg tracking-tighter">Profil Mitra Burjo</h1>
+        <div class="w-10"></div>
+    </header>
+
+    <main class="p-6 flex-1 max-w-md mx-auto w-full space-y-6 text-center">
+        <div class="relative w-32 h-32 mx-auto">
+            <div id="avatar-preview" class="w-full h-full rounded-full bg-[#ffd700] border-4 border-white shadow-md flex items-center justify-center text-[#1f1b11] overflow-hidden">
+                <span class="material-symbols-outlined text-5xl">storefront</span>
+            </div>
+            <label for="input-avatar" class="absolute bottom-0 right-0 bg-[#1f1b11] text-[#ffd700] w-10 h-10 rounded-full flex items-center justify-center cursor-pointer shadow-md active:scale-90 transition-transform">
+                <span class="material-symbols-outlined text-sm">photo_camera</span>
+                <input id="input-avatar" type="file" accept="image/*" class="hidden">
+            </label>
+        </div>
+
+        <div class="bg-white p-5 rounded-3xl border border-[#f5eddb] shadow-sm text-left space-y-4">
+            <div>
+                <label class="text-xs font-bold text-[#7e7760] block mb-1">ID Warung (Permanen)</label>
+                <input id="display-id" type="text" disabled class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] font-bold text-gray-400 cursor-not-allowed">
+            </div>
+            <div>
+                <label class="text-xs font-bold text-[#7e7760] block mb-1">Nama Aplikasi Burjo</label>
+                <input id="input-nama" type="text" placeholder="Masukkan Nama Burjo" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-sm font-bold focus:outline-none focus:border-[#ffd700]">
+            </div>
+            <input type="hidden" id="base64-avatar">
+        </div>
+
+        <button id="btn-simpan" class="w-full bg-[#ffd700] text-[#705d00] py-4 rounded-2xl font-black text-sm border-2 border-[#1f1b11] shadow-[0_4px_0_#1f1b11] active:translate-y-1 active:shadow-none transition-all">
+            SIMPAN PERUBAHAN
+        </button>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = { 
+            apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
+            projectId: "myburjo", 
+            appId: "1:25464436577:web:89a3105315f8fbcc703720" 
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const burjoId = urlParams.get('id') || localStorage.getItem("myburjo_penjual_id") || "12052601";
+
+        document.getElementById('btn-kembali').onclick = () => window.location.href = `laman-utama-penjual.html?id=${burjoId}`;
+
+        const docRef = doc(db, "penjual", burjoId);
+
+        // Ambil Data Awal
+        async function loadProfil() {
+            document.getElementById('display-id').value = burjoId;
+            try {
+                const snap = await getDoc(docRef);
+                if(snap.exists()) {
+                    const data = snap.data();
+                    document.getElementById('input-nama').value = data.nama_burjo || "";
+                    if(data.foto_profil) {
+                        document.getElementById('avatar-preview').innerHTML = `<img src="${data.foto_profil}" class="w-full h-full object-cover">`;
+                        document.getElementById('base64-avatar').value = data.foto_profil;
+                    }
+                }
+            } catch(e) {
+                console.error("Gagal mengambil data profil:", e);
+            }
+        }
+
+        // Listener unggahan file lokal ke base64
+        document.getElementById('input-avatar').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(file) {
+                if (file.size > 500 * 1024) { 
+                    alert("Ukuran foto terlalu besar! Maksimal rekomendasi adalah 500KB.");
+                    this.value = "";
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const base64String = event.target.result;
+                    document.getElementById('avatar-preview').innerHTML = `<img src="${base64String}" class="w-full h-full object-cover">`;
+                    document.getElementById('base64-avatar').value = base64String;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Simpan Data Kembali Ke Firestore
+        document.getElementById('btn-simpan').onclick = async () => {
+            const btn = document.getElementById('btn-simpan');
+            const namaBaru = document.getElementById('input-nama').value;
+            const avatarBaru = document.getElementById('base64-avatar').value;
+
+            if(!namaBaru) return alert("Nama burjo tidak boleh kosong!");
+
+            btn.innerText = "MENYIMPAN...";
+            btn.disabled = true;
+
+            try {
+                await updateDoc(docRef, {
+                    nama_burjo: namaBaru,
+                    foto_profil: avatarBaru
+                });
+                alert("Profil Berhasil Diperbarui!");
+                window.location.href = `laman-utama-penjual.html?id=${burjoId}`;
+            } catch(e) {
+                alert("Gagal memperbarui data.");
+                console.error(e);
+            } finally {
+                btn.innerText = "SIMPAN PERUBAHAN";
+                btn.disabled = false;
+            }
+        };
+
+        loadProfil();
+    </script>
+</body>
+</html>

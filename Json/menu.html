@@ -59,7 +59,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = { 
             apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
@@ -69,14 +69,15 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const burjoId = new URLSearchParams(window.location.search).get('id') || "12052601";
+        const urlParams = new URLSearchParams(window.location.search);
+        const burjoId = urlParams.get('id') || "12052601";
         
         let allMenu = [];
         let listDeskripsi = [];
+        let tabSekarang = 'Makanan'; // Menyimpan state tab aktif
 
         window.pilihMeja = (index) => {
             const rawText = listDeskripsi[index] || "Informasi meja tidak tersedia.";
-            // Membersihkan teks jika formatnya "Meja X: Muat Y Orang, Deskripsi"
             const cleanText = rawText.includes(':') ? rawText.split(', ')[1] || rawText : rawText;
             document.getElementById('deskripsi-meja').innerText = cleanText;
             
@@ -85,6 +86,7 @@
         };
 
         window.gantiTab = (k) => {
+            tabSekarang = k;
             document.getElementById('tab-makan').className = k === 'Makanan' ? "flex-1 py-3.5 rounded-xl tab-active" : "flex-1 py-3.5 rounded-xl text-[#7e7760] font-semibold";
             document.getElementById('tab-minum').className = k === 'Minuman' ? "flex-1 py-3.5 rounded-xl tab-active" : "flex-1 py-3.5 rounded-xl text-[#7e7760] font-semibold";
             renderMenu(k);
@@ -93,15 +95,37 @@
         function renderMenu(k) {
             const c = document.getElementById('daftar-menu'); 
             c.innerHTML = "";
-            allMenu.filter(m => m.kategori === k).forEach(item => {
+            
+            const filteredMenu = allMenu.filter(m => m.kategori === k);
+            
+            if (filteredMenu.length === 0) {
+                c.innerHTML = `<div class="py-10 text-center opacity-40 text-sm italic font-medium">Menu belum tersedia.</div>`;
+                return;
+            }
+
+            filteredMenu.forEach(item => {
+                const imgUrl = item.foto || '';
+                // Deteksi status aktif/nonaktif dari penjual
+                const isTersedia = item.status !== 'nonaktif';
+
                 c.innerHTML += `
-                    <div class="bg-white p-4 rounded-[24px] flex gap-4 items-center shadow-sm border border-[#f5eddb]">
-                        <div class="w-20 h-20 bg-[#f5eddb] rounded-[16px] flex items-center justify-center text-[#e1d9c8]">
-                            <span class="material-symbols-outlined text-3xl">image</span>
+                    <div class="bg-white p-4 rounded-[24px] flex gap-4 items-center shadow-sm border border-[#f5eddb] relative overflow-hidden">
+                        
+                        <div class="w-20 h-20 bg-[#f5eddb] rounded-[16px] flex-shrink-0 flex items-center justify-center text-[#e1d9c8] overflow-hidden relative">
+                            ${imgUrl ? `<img src="${imgUrl}" alt="${item.nama}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                        <span class="material-symbols-outlined text-3xl" style="display:none;">image</span>` 
+                                     : `<span class="material-symbols-outlined text-3xl">image</span>`}
+                            
+                            ${!isTersedia ? `
+                            <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                                <span class="bg-red-600 text-white font-black text-[9px] tracking-wider uppercase px-2 py-0.5 rounded shadow-sm">Habis</span>
+                            </div>` : ''}
                         </div>
-                        <div class="flex-1">
-                            <h4 class="font-bold text-[#1f1b11]">${item.nama}</h4>
-                            <p class="text-[#705d00] text-sm font-bold mt-1">Rp ${item.harga.toLocaleString()}</p>
+                        
+                        <div class="flex-1 min-w-0 ${!isTersedia ? 'opacity-40' : ''}">
+                            <h4 class="font-bold text-[#1f1b11] truncate">${item.nama}</h4>
+                            ${item.deskripsi ? `<p class="text-[10px] text-[#7e7760] mt-0.5 line-clamp-1">${item.deskripsi}</p>` : ''}
+                            <p class="text-[#705d00] text-sm font-bold mt-1">Rp ${item.harga.toLocaleString('id-ID')}</p>
                         </div>
                     </div>`;
             });
@@ -111,28 +135,28 @@
         function initRealtime() {
             const docRef = doc(db, "penjual", burjoId);
             
-            // Mendengarkan perubahan data secara Real-time
             onSnapshot(docRef, (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     document.getElementById('nama-burjo').innerText = data.nama_burjo;
                     listDeskripsi = data.deskripsi_meja || [];
                     
-                    // Ambil list meja yang diisi penjual (meja_aktif adalah array nomor meja)
                     const mejaAktif = data.meja_aktif || [];
-                    const tersedia = 10 - mejaAktif.length;
+                    // SEKARANG DINAMIS: Mengikuti jumlah data di katalog meja
+                    const totalMeja = listDeskripsi.length; 
+                    const tersedia = totalMeja - mejaAktif.length;
                     
-                    document.getElementById('text-status').innerText = `${tersedia}/10 MEJA TERSEDIA`;
+                    document.getElementById('text-status').innerText = `${tersedia}/${totalMeja} MEJA TERSEDIA`;
                     
-                    // Update Peta
+                    // Perbaikan Link Google Maps sekalian (ada typo bawaan di filemu)
                     if(data.lokasi) {
-                        document.getElementById('btn-gas').onclick = () => window.open(`https://www.google.com/maps?q=${data.lokasi.latitude},${data.lokasi.longitude}`, '_blank');
+                        document.getElementById('btn-gas').onclick = () => window.open(`https://www.google.com/maps/search/?api=1&query=${data.lokasi.latitude},${data.lokasi.longitude}`, '_blank');
                     }
 
-                    // Render Grid Meja secara dinamis sesuai data meja_aktif
                     const grid = document.getElementById('grid-meja');
                     grid.innerHTML = "";
-                    for(let i = 1; i <= 10; i++) {
+                    // Loop dinamis sesuai total meja yang ada di database
+                    for(let i = 1; i <= totalMeja; i++) {
                         const isTerpakai = mejaAktif.includes(i.toString()) || mejaAktif.includes(i);
                         grid.innerHTML += `
                             <div id="meja-${i-1}" onclick="pilihMeja(${i-1})" 
@@ -143,19 +167,18 @@
                     }
                 }
             });
-        }
 
-        // Load Menu Sekali Saja (Menu jarang berubah dibanding status meja)
-        async function loadMenu() {
-            const mSnap = await getDocs(collection(db, "penjual", burjoId, "katalog_menu"));
-            allMenu = [];
-            mSnap.forEach(m => allMenu.push(m.data())); 
-            renderMenu('Makanan');
+            // DIUBAH KE REAL-TIME: Menggunakan onSnapshot agar perubahan status/foto menu langsung ter-update otomatis di pembeli
+            const menuRef = collection(db, "penjual", burjoId, "katalog_menu");
+            onSnapshot(menuRef, (mSnap) => {
+                allMenu = [];
+                mSnap.forEach(m => allMenu.push(m.data())); 
+                renderMenu(tabSekarang);
+            });
         }
 
         // Jalankan Semuanya
         initRealtime();
-        loadMenu();
     </script>
 </body>
 </html>

@@ -19,18 +19,18 @@
 <body class="antialiased pb-40">
     
     <header class="bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-[#f5eddb] shadow-sm">
-        <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-[#ffd700] flex items-center justify-center border-2 border-[#1f1b11]">
-                <span class="material-symbols-outlined text-[#1f1b11]">storefront</span>
-            </div>
-            <div>
-                <h1 id="nama-toko" class="font-extrabold text-lg tracking-tighter leading-none">Memuat...</h1>
-                <p class="text-xs font-semibold text-[#7e7760] mt-1">ID: <span id="display-id" class="text-[#705d00]">--------</span></p>
-            </div>
+    <div id="header-profile-trigger" class="flex items-center gap-4 cursor-pointer active:opacity-70 transition-all">
+        <div id="logo-container" class="w-12 h-12 rounded-full bg-[#ffd700] flex items-center justify-center border-2 border-[#1f1b11] overflow-hidden">
+            <span class="material-symbols-outlined text-[#1f1b11]">storefront</span>
         </div>
-        <button onclick="window.location.href='profile.html'" class="w-10 h-10 flex items-center justify-center rounded-xl bg-[#fff9ef] text-[#dc2626]">
-            <span class="material-symbols-outlined">logout</span>
-        </button>
+        <div>
+            <h1 id="nama-toko" class="font-extrabold text-lg tracking-tighter leading-none">Memuat...</h1>
+            <p class="text-xs font-semibold text-[#7e7760] mt-1">ID: <span id="display-id" class="text-[#705d00]">--------</span></p>
+        </div>
+    </div>
+    <button onclick="window.location.href='login-penjual.html'" class="w-10 h-10 flex items-center justify-center rounded-xl bg-[#fff9ef] text-[#dc2626]">
+        <span class="material-symbols-outlined">logout</span>
+    </button>
     </header>
 
     <main class="p-5 space-y-6">
@@ -89,6 +89,8 @@
         document.getElementById('nav-katalog-meja').href = `laman-utama-penjual.html?id=${burjoId}`;
         document.getElementById('nav-katalog-menu').href = `edit-katalog-menu.html?id=${burjoId}`;
         document.getElementById('link-edit-meja').href = `edit-katalog-meja.html?id=${burjoId}`;
+        // Header klik menuju profil penjual
+        document.getElementById('header-profile-trigger').onclick = () => window.location.href = `profile-penjual.html?id=${burjoId}`;
 
         let listMejaTerpakai = [];
 
@@ -97,16 +99,35 @@
                 const data = snapshot.data();
                 document.getElementById('nama-toko').innerText = data.nama_burjo;
                 document.getElementById('display-id').innerText = burjoId;
+
+                // REAL-TIME LOGO HEADER
+                const logoContainer = document.getElementById('logo-container');
+                if (data.foto_profil) {
+                    logoContainer.innerHTML = `<img src="${data.foto_profil}" class="w-full h-full object-cover">`;
+                } else {
+                    logoContainer.innerHTML = `<span class="material-symbols-outlined text-[#1f1b11]">storefront</span>`;
+                }
+
                 listMejaTerpakai = data.meja_aktif || []; 
-                renderMeja(listMejaTerpakai, data.detail_meja || []);
+                // Kirim array deskripsi_meja ke fungsi render
+                renderMeja(listMejaTerpakai, data.detail_meja || [], data.deskripsi_meja || []);
             }
         });
 
-        function renderMeja(listTerpakai, detailUser) {
+        function renderMeja(listTerpakai, detailUser, deskripsiMeja) {
             const container = document.getElementById('container-meja');
-            document.getElementById('indikator-jumlah').innerText = `${listTerpakai.length}/10 TERPAKAI`;
+            
+            // 1. KUNCI POSISI SCROLL: Amankan posisi horizontal kontainer dan vertikal layar halaman
+            const simpanScrollX = container.scrollLeft;
+            const simpanScrollY = window.scrollY;
+
+            // 2. KUNCI TINGGI ELEMEN: Cegah halaman menyusut (collapse) saat innerHTML dikosongkan
+            container.style.minHeight = `${container.offsetHeight}px`;
+
+            const totalMeja = deskripsiMeja.length ? deskripsiMeja.length : 10;
+            document.getElementById('indikator-jumlah').innerText = `${listTerpakai.length}/${totalMeja} TERPAKAI`;
             container.innerHTML = "";
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 1; i <= totalMeja; i++) {
                 const isTerpakai = listTerpakai.includes(i);
                 const dataUser = detailUser.find(d => d.nomor == i);
                 const username = isTerpakai ? (dataUser?.user || "Pelanggan") : "-";
@@ -126,6 +147,13 @@
                         </button>
                     </div>`;
             }
+
+            // 3. KEMBALIKAN POSISI SCROLL: Kembalikan posisi scroll tepat setelah render HTML selesai
+            container.scrollLeft = simpanScrollX;
+            window.scrollTo(window.scrollX, simpanScrollY);
+            
+            // 4. LEPASKAN KUNCI TINGGI: Reset minHeight agar kontainer bisa berkembang/mengecil secara normal lagi
+            container.style.minHeight = "";
         }
 
         window.prosesMeja = async (nomor, aksi) => {

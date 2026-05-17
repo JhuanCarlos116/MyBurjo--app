@@ -15,40 +15,49 @@
     </style>
 </head>
 <body class="antialiased pb-40">
-    
+   
     <header class="bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-[#f5eddb] shadow-sm">
         <div class="flex items-center gap-3">
             <button id="btn-back" class="material-symbols-outlined text-[#705d00]">arrow_back_ios</button>
-            <h1 class="font-extrabold text-lg tracking-tighter">Edit Katalog Menu</h1>
+            <h1 class="font-extrabold text-lg tracking-tighter">Katalog Menu</h1>
         </div>
-        <button onclick="bukaModal()" class="bg-[#ffd700] px-4 py-2 rounded-xl border border-[#1f1b11] flex items-center gap-1 active:scale-90 shadow-sm">
+        <button onclick="bukaModal()" class="bg-[#ffd700] px-4 py-2 rounded-xl border border-[#1f1b11] flex items-center gap-1 active:scale-90 transition-transform shadow-sm">
             <span class="material-symbols-outlined text-sm">add</span>
             <span class="text-[10px] font-bold uppercase">Tambah</span>
         </button>
     </header>
 
-    <main class="p-5 space-y-6">
-        <div class="flex gap-2 bg-[#e5dfd3]/30 p-1 rounded-2xl">
-            <button id="tab-makanan" onclick="gantiTab('makanan')" class="flex-1 py-3 rounded-xl text-xs font-bold transition-all tab-active">Makanan</button>
-            <button id="tab-minuman" onclick="gantiTab('minuman')" class="flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]">Minuman</button>
+    <main class="p-5 space-y-6 text-left">
+        <div class="flex gap-2 bg-[#e5dfd3]/30 p-1 rounded-2xl sticky top-[80px] z-40 backdrop-blur-md">
+            <button id="tab-makanan" onclick="gantiTab('Makanan')" class="flex-1 py-3 rounded-xl text-xs font-bold transition-all tab-active">Makanan</button>
+            <button id="tab-minuman" onclick="gantiTab('Minuman')" class="flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]">Minuman</button>
         </div>
 
-        <div id="grid-menu" class="grid grid-cols-2 gap-4"></div>
+        <div id="list-menu" class="space-y-4"></div>
     </main>
 
     <div id="modal-form" class="fixed inset-0 bg-black/60 z-[200] hidden flex items-center justify-center p-6 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 space-y-4">
-            <h2 id="modal-title" class="font-extrabold text-lg">Item Baru</h2>
-            <div class="space-y-4">
-                <input id="input-nama" type="text" placeholder="Nama Menu" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-xs font-bold">
+        <div class="bg-white w-full max-w-sm rounded-[32px] p-6 space-y-5 shadow-2xl">
+            <h2 id="modal-title" class="font-extrabold text-xl text-[#705d00]">Item Baru</h2>
+            <div class="space-y-3">
+                <input id="input-nama" type="text" placeholder="Nama Menu" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-sm font-bold focus:outline-none focus:border-[#ffd700]">
+                
+                <textarea id="input-deskripsi" placeholder="Deskripsi Singkat (Opsional)" class="w-full bg-[#fff9ef] p-4 rounded-2xl border border-[#f5eddb] text-sm font-medium focus:outline-none focus:border-[#ffd700] resize-none h-20"></textarea>
+                
+                <div class="space-y-1 text-left">
+                    <label class="text-xs font-bold text-[#7e7760] block px-1">Foto Menu (Kamera / Galeri lokal)</label>
+                    <input id="input-foto-file" type="file" accept="image/*" class="w-full bg-[#fff9ef] p-3 rounded-2xl border border-[#f5eddb] text-sm font-medium focus:outline-none focus:border-[#ffd700]">
+                    <input id="input-foto" type="hidden">
+                </div>
+                
                 <div class="relative">
-                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-[#7e7760]">Rp</span>
-                    <input id="input-harga" type="number" placeholder="Harga" class="w-full bg-[#fff9ef] p-4 pl-10 rounded-2xl border border-[#f5eddb] text-xs font-bold">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-[#7e7760]">Rp</span>
+                    <input id="input-harga" type="number" placeholder="Harga" class="w-full bg-[#fff9ef] p-4 pl-12 rounded-2xl border border-[#f5eddb] text-sm font-bold focus:outline-none focus:border-[#ffd700]">
                 </div>
             </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="tutupModal()" class="flex-1 py-4 text-xs font-bold text-[#dc2626]">Batal</button>
-                <button onclick="simpanKeFirebase()" class="flex-1 py-4 bg-[#ffd700] rounded-2xl text-xs font-black border-2 border-[#1f1b11]">SIMPAN</button>
+            <div class="flex gap-3 pt-2">
+                <button onclick="tutupModal()" class="flex-1 py-4 text-sm font-bold text-[#dc2626] bg-red-50 rounded-2xl active:scale-95 transition-transform">Batal</button>
+                <button onclick="simpanKeFirebase()" class="flex-1 py-4 bg-[#ffd700] rounded-2xl text-sm font-black border-2 border-[#1f1b11] shadow-[0_4px_0_#1f1b11] active:translate-y-1 active:shadow-none transition-all">SIMPAN</button>
             </div>
         </div>
     </div>
@@ -68,80 +77,168 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const firebaseConfig = { 
-            apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
-            projectId: "myburjo", 
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE",
+            projectId: "myburjo",
             appId: "1:25464436577:web:89a3105315f8fbcc703720"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const urlParams = new URLSearchParams(window.location.search);
-        const burjoId = urlParams.get('id') || "12052601"; 
+        const burjoId = urlParams.get('id') || "12052601";
 
-        // Update Link Navigasi agar membawa ID
         document.getElementById('nav-meja').href = `laman-utama-penjual.html?id=${burjoId}`;
         document.getElementById('nav-menu').href = `edit-katalog-menu.html?id=${burjoId}`;
         document.getElementById('btn-back').onclick = () => window.location.href = `laman-utama-penjual.html?id=${burjoId}`;
 
         const menuRef = collection(db, "penjual", burjoId, "katalog_menu");
         let semuaMenu = [];
-        let tabSekarang = 'makanan';
+        let tabSekarang = 'Makanan';
         let idEdit = null;
 
         onSnapshot(menuRef, (snapshot) => {
             semuaMenu = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderGrid();
+            renderList();
         });
 
         window.gantiTab = (t) => {
             tabSekarang = t;
-            document.getElementById('tab-makanan').className = t === 'makanan' ? 'flex-1 py-3 rounded-xl text-xs font-bold tab-active' : 'flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]';
-            document.getElementById('tab-minuman').className = t === 'minuman' ? 'flex-1 py-3 rounded-xl text-xs font-bold tab-active' : 'flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]';
-            renderGrid();
+            document.getElementById('tab-makanan').className = t === 'Makanan' ? 'flex-1 py-3 rounded-xl text-xs font-bold tab-active' : 'flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]';
+            document.getElementById('tab-minuman').className = t === 'Minuman' ? 'flex-1 py-3 rounded-xl text-xs font-bold tab-active' : 'flex-1 py-3 rounded-xl text-xs font-bold text-[#7e7760]';
+            renderList();
         };
 
-        function renderGrid() {
-            const grid = document.getElementById('grid-menu');
+        function renderList() {
+            const container = document.getElementById('list-menu');
             const filtered = semuaMenu.filter(m => m.kategori === tabSekarang);
-            grid.innerHTML = filtered.length === 0 ? `<div class="col-span-2 py-20 text-center opacity-40 text-xs italic">Kosong.</div>` : 
-            filtered.map(m => `
-                <div class="bg-white p-3 rounded-[24px] border border-[#e5dfd3] ambient-shadow flex flex-col gap-3">
-                    <div class="px-1">
-                        <h3 class="font-extrabold text-[11px] leading-tight text-[#1f1b11]">${m.nama}</h3>
-                        <p class="text-[#705d00] font-black text-xs mt-1">Rp ${m.harga.toLocaleString()}</p>
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="py-20 text-center opacity-40 text-sm italic font-medium">Belum ada menu di kategori ini.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(m => {
+                const imgUrl = m.foto || ''; 
+                // Default status aktif jika belum diset di DB
+                const isAktif = m.status !== 'nonaktif'; 
+                
+                return `
+                <div class="bg-white p-4 rounded-[24px] border border-[#f5eddb] shadow-sm flex gap-4 items-center transition-opacity duration-300 ${isAktif ? 'opacity-100' : 'opacity-50'}">
+                    <div class="w-24 h-24 bg-[#f5eddb] rounded-[16px] flex-shrink-0 flex items-center justify-center text-[#e1d9c8] overflow-hidden relative">
+                        ${imgUrl ? `<img src="${imgUrl}" alt="${m.nama}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <span class="material-symbols-outlined text-3xl" style="display:none;">image</span>` 
+                                 : `<span class="material-symbols-outlined text-3xl">image</span>`}
+                        
+                        <div class="absolute bottom-1 left-1 right-1 px-1 py-0.5 rounded-md text-[8px] font-black text-center uppercase ${isAktif ? 'bg-green-500 text-white' : 'bg-red-600 text-white'}">
+                            ${isAktif ? 'Tersedia' : 'Habis'}
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="hapusMenu('${m.id}')" class="flex-1 bg-red-50 text-red-600 py-3 rounded-xl text-[9px] font-bold">Hapus</button>
-                        <button onclick="editMenu('${m.id}')" class="flex-1 bg-[#1f1b11] text-[#ffd700] py-3 rounded-xl text-[9px] font-bold">Edit</button>
+                    
+                    <div class="flex-1">
+                        <h3 class="font-extrabold text-sm text-[#1f1b11] leading-tight">${m.nama}</h3>
+                        ${m.deskripsi ? `<p class="text-[10px] text-[#7e7760] mt-1 line-clamp-1">${m.deskripsi}</p>` : ''}
+                        <p class="text-[#705d00] font-black text-sm mt-1">Rp ${m.harga.toLocaleString('id-ID')}</p>
+                        
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="toggleStatus('${m.id}', '${m.status || 'aktif'}')" class="px-2 py-2 rounded-lg text-[10px] font-bold border active:scale-95 transition-transform ${isAktif ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}">
+                                ${isAktif ? 'Set Habis' : 'Set Tersedia'}
+                            </button>
+                            
+                            <button onclick="editMenu('${m.id}')" class="flex-1 bg-[#1f1b11] text-[#ffd700] py-2 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">Edit</button>
+                            
+                            <button onclick="hapusMenu('${m.id}')" class="bg-red-50 text-red-600 px-3 rounded-lg text-[10px] font-bold active:scale-95 transition-transform border border-red-100">Hapus</button>
+                        </div>
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
+
+        // Fungsi baru untuk merubah status tanpa menghapus
+        window.toggleStatus = async (id, statusSekarang) => {
+            const statusBaru = statusSekarang === 'nonaktif' ? 'aktif' : 'nonaktif';
+            await setDoc(doc(db, "penjual", burjoId, "katalog_menu", id), { 
+                status: statusBaru 
+            }, { merge: true });
+        };
 
         window.simpanKeFirebase = async () => {
             const nama = document.getElementById('input-nama').value;
             const harga = document.getElementById('input-harga').value;
-            if(!nama || !harga) return alert("Lengkapi data!");
+            const deskripsi = document.getElementById('input-deskripsi').value;
+            const foto = document.getElementById('input-foto').value;
+
+            if(!nama || !harga) return alert("Nama dan Harga wajib diisi!");
+            
             const id = idEdit || Date.now().toString();
-            await setDoc(doc(db, "penjual", burjoId, "katalog_menu", id), { nama, harga: parseInt(harga), kategori: tabSekarang }, { merge: true });
+            
+            const payload = { 
+                nama: nama, 
+                harga: parseInt(harga), 
+                deskripsi: deskripsi,
+                foto: foto,
+                kategori: tabSekarang 
+            };
+
+            // Jika item baru, berikan status default 'aktif'
+            if(!idEdit) payload.status = 'aktif';
+            
+            await setDoc(doc(db, "penjual", burjoId, "katalog_menu", id), payload, { merge: true });
+            
             tutupModal();
         };
 
-        window.bukaModal = () => document.getElementById('modal-form').classList.remove('hidden');
+        window.bukaModal = () => {
+            document.getElementById('modal-title').innerText = "Item Baru";
+            document.getElementById('modal-form').classList.remove('hidden');
+        };
+
         window.tutupModal = () => {
             document.getElementById('modal-form').classList.add('hidden');
             idEdit = null;
             document.getElementById('input-nama').value = "";
             document.getElementById('input-harga').value = "";
+            document.getElementById('input-deskripsi').value = "";
+            document.getElementById('input-foto').value = "";
+            document.getElementById('input-foto-file').value = "";
         };
+
         window.editMenu = (id) => {
             const m = semuaMenu.find(item => item.id === id);
             idEdit = id;
-            document.getElementById('input-nama').value = m.nama;
-            document.getElementById('input-harga').value = m.harga;
-            bukaModal();
+            document.getElementById('modal-title').innerText = "Edit Menu";
+            document.getElementById('input-nama').value = m.nama || "";
+            document.getElementById('input-harga').value = m.harga || "";
+            document.getElementById('input-deskripsi').value = m.deskripsi || "";
+            document.getElementById('input-foto').value = m.foto || ""; // Mengisi kolom foto lama agar bisa diedit
+            document.getElementById('modal-form').classList.remove('hidden');
         };
-        window.hapusMenu = async (id) => { if(confirm("Hapus?")) await deleteDoc(doc(db, "penjual", burjoId, "katalog_menu", id)); };
+
+        window.hapusMenu = async (id) => { 
+            if(confirm("Apakah Anda yakin ingin menghapus menu ini dari database secara permanen?")) {
+                await deleteDoc(doc(db, "penjual", burjoId, "katalog_menu", id)); 
+            }
+        };
+
+        // Listener untuk konversi gambar lokal ke string Base64 secara realtime
+        document.getElementById('input-foto-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validasi ukuran agar dokumen Firestore tidak overload (Maksimal rekomendasi ~500kb untuk performa)
+                if (file.size > 1024 * 1024) { 
+                    alert("Ukuran foto terlalu besar! Gunakan foto di bawah 1MB.");
+                    this.value = "";
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Isi hidden input dengan hasil konversi base64
+                    document.getElementById('input-foto').value = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
     </script>
 </body>
 </html>
