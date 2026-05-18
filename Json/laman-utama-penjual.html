@@ -105,13 +105,15 @@
         document.getElementById('link-edit-meja').href = `edit-katalog-meja.html?id=${burjoId}`;
         document.getElementById('header-profile-trigger').onclick = () => window.location.href = `profile-penjual.html?id=${burjoId}`;
 
+        // Perbaikan: Deklarasikan variabel state di atas sebelum dipanggil di onSnapshot
         let listMejaTerpakai = [];
-        let listDetailMeja = []; // <-- Tambahkan ini untuk menampung data user dari DB
+        let listDetailMeja = []; 
+        let dataBurjoSekarang = null; // <-- INI YANG TADI HILANG DAN MEMBUAT ERROR
 
         onSnapshot(docRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
-                dataBurjoSekarang = data;
+                dataBurjoSekarang = data; // Sekarang ini berjalan aman tanpa error
                 document.getElementById('nama-toko').innerText = data.nama_burjo;
                 document.getElementById('display-id').innerText = burjoId;
 
@@ -123,8 +125,7 @@
                 }
 
                 listMejaTerpakai = data.meja_aktif || []; 
-                listDetailMeja = data.detail_meja || []; // <-- SIMPAN data detail_meja dari DB ke variabel global
-                // Kirim array deskripsi_meja ke fungsi render
+                listDetailMeja = data.detail_meja || []; 
                 renderMeja(listMejaTerpakai, listDetailMeja, data.deskripsi_meja || []);
             }
         });
@@ -167,7 +168,7 @@
 
         window.prosesMeja = async (nomor, aksi) => {
             let newList = [...listMejaTerpakai];
-            let newDetail = [...listDetailMeja]; // Copy array detail meja lama
+            let newDetail = [...listDetailMeja];
             const nomorAngka = parseInt(nomor);
 
             if (aksi === 'lepas') {
@@ -191,13 +192,11 @@
         window.pemicuHapusBurjo = async () => {
             if (!dataBurjoSekarang) return alert("Data belum termuat sepenuhnya.");
 
-            // Konfirmasi Tahap 1
             const konfirmasiPertama = confirm(`Apakah Anda yakin ingin menghapus "${dataBurjoSekarang.nama_burjo}"?\nTindakan ini tidak dapat dibatalkan.`);
             if (!konfirmasiPertama) return;
 
-            // Konfirmasi Tahap 2 (Verifikasi PIN Keamanan)
             const inputPin = prompt("Untuk keamanan, silakan masukkan 4 digit PIN warung Anda:");
-            if (inputPin === null) return; // Jika membatalkan prompt
+            if (inputPin === null) return; 
 
             const pinBenar = dataBurjoSekarang.pin ? dataBurjoSekarang.pin.toString() : "";
             
@@ -206,15 +205,9 @@
                 if (!konfirmasiFinal) return;
 
                 try {
-                    // Eksekusi hapus dokumen utama di Firestore
                     await deleteDoc(docRef);
-                    
                     alert("Warung Burjo Anda berhasil dihapus dari sistem.");
-                    
-                    // Bersihkan session local storage
                     localStorage.removeItem("myburjo_penjual_id");
-                    
-                    // Alihkan paksa kembali ke portal login utama penjual
                     window.location.href = "login-penjual.html";
                 } catch (error) {
                     alert("Gagal menghapus data: " + error.message);
