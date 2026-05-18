@@ -93,6 +93,7 @@
         document.getElementById('header-profile-trigger').onclick = () => window.location.href = `profile-penjual.html?id=${burjoId}`;
 
         let listMejaTerpakai = [];
+        let listDetailMeja = []; // <-- Tambahkan ini untuk menampung data user dari DB
 
         onSnapshot(docRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -109,8 +110,9 @@
                 }
 
                 listMejaTerpakai = data.meja_aktif || []; 
+                listDetailMeja = data.detail_meja || []; // <-- SIMPAN data detail_meja dari DB ke variabel global
                 // Kirim array deskripsi_meja ke fungsi render
-                renderMeja(listMejaTerpakai, data.detail_meja || [], data.deskripsi_meja || []);
+                renderMeja(listMejaTerpakai, listDetailMeja, data.deskripsi_meja || []);
             }
         });
 
@@ -158,9 +160,24 @@
 
         window.prosesMeja = async (nomor, aksi) => {
             let newList = [...listMejaTerpakai];
-            if (aksi === 'lepas') newList = newList.filter(n => n !== nomor);
-            else if (!newList.includes(nomor)) newList.push(nomor);
-            await updateDoc(docRef, { meja_aktif: newList, status_meja: newList.length.toString() });
+            let newDetail = [...listDetailMeja]; // Copy array detail meja lama
+            const nomorAngka = parseInt(nomor);
+
+            if (aksi === 'lepas') {
+                newList = newList.filter(n => parseInt(n) !== nomorAngka);
+                newDetail = newDetail.filter(d => parseInt(d.nomor) !== nomorAngka);
+            } else if (aksi === 'isi') {
+                if (!newList.map(n => parseInt(n)).includes(nomorAngka)) {
+                    newList.push(nomorAngka);
+                    newDetail.push({ nomor: nomorAngka, user: "Pelanggan (Manual)" });
+                }
+            }
+
+            await updateDoc(docRef, {
+                meja_aktif: newList,
+                status_meja: newList.length.toString(),
+                detail_meja: newDetail
+            });
         };
     </script>
 </body>
