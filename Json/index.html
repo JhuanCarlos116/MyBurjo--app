@@ -22,7 +22,7 @@
         #splash-screen {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background-color: #fff9ef; z-index: 99999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
+            display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
         }
         .logo-wrapper { position: relative; }
         .logo-circle {
@@ -98,16 +98,29 @@
     </nav>
 
     <script>
-        // Logika Untuk Menghilangkan Splash Screen
-        document.body.style.overflow = 'hidden'; // Kunci scroll layar saat animasi
-        setTimeout(() => {
-            const splash = document.getElementById('splash-screen');
-            splash.classList.add('zoom-out');
+        const splash = document.getElementById('splash-screen');
+
+        // Cek apakah user sudah pernah melihat splash screen di sesi ini
+        if (!sessionStorage.getItem('splashShown')) {
+            // Jika BELUM PERNAH (Baru masuk aplikasi)
+            splash.style.display = 'flex'; // Tampilkan splash screen
+            document.body.style.overflow = 'hidden'; // Kunci scroll layar saat animasi
+
             setTimeout(() => {
-                splash.style.display = 'none'; // Hapus elemen splash agar bisa klik tombol di bawahnya
-                document.body.style.overflow = 'auto'; // Buka kembali kunci scroll
-            }, 600);
-        }, 2200); // Tampil selama 2.2 detik
+                splash.classList.add('zoom-out');
+                setTimeout(() => {
+                    splash.style.display = 'none'; 
+                    document.body.style.overflow = 'auto'; // Buka kembali kunci scroll
+                    
+                    // Tandai bahwa splash screen sudah pernah ditampilkan
+                    sessionStorage.setItem('splashShown', 'true');
+                }, 600);
+            }, 2200); // Tampil selama 2.2 detik
+        } else {
+            // Jika SUDAH PERNAH (Pindah dari halaman lain), langsung hilangkan splash screen
+            splash.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
     </script>
 
     <script type="module">
