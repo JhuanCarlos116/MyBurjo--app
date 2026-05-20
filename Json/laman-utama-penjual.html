@@ -56,6 +56,20 @@
                 <span class="material-symbols-outlined text-[#d1c8b4]">chevron_right</span>
             </a>
         </section>
+
+        <section class="pt-4 border-t border-dashed border-[#e5dfd3]">
+            <div class="bg-red-50 p-5 rounded-3xl border border-red-200 flex flex-col gap-3">
+                <div>
+                    <h3 class="font-bold text-sm text-red-800 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-lg">delete_forever</span> Zona Bahaya
+                    </h3>
+                    <p class="text-[10px] text-red-600 mt-0.5">Menghapus warung akan menghilangkan seluruh data meja, profil, lokasi, dan katalog secara permanen dari aplikasi.</p>
+                </div>
+                <button onclick="pemicuHapusBurjo()" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold text-xs shadow-sm hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    Hapus Warung Burjo Ini
+                </button>
+            </div>
+        </section>
     </main>
 
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#f5eddb] px-8 py-4 flex justify-around items-center z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
@@ -71,7 +85,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = { 
             apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
@@ -89,18 +103,20 @@
         document.getElementById('nav-katalog-meja').href = `laman-utama-penjual.html?id=${burjoId}`;
         document.getElementById('nav-katalog-menu').href = `edit-katalog-menu.html?id=${burjoId}`;
         document.getElementById('link-edit-meja').href = `edit-katalog-meja.html?id=${burjoId}`;
-        // Header klik menuju profil penjual
         document.getElementById('header-profile-trigger').onclick = () => window.location.href = `profile-penjual.html?id=${burjoId}`;
 
+        // Perbaikan: Deklarasikan variabel state di atas sebelum dipanggil di onSnapshot
         let listMejaTerpakai = [];
+        let listDetailMeja = []; 
+        let dataBurjoSekarang = null; // <-- INI YANG TADI HILANG DAN MEMBUAT ERROR
 
         onSnapshot(docRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
+                dataBurjoSekarang = data; // Sekarang ini berjalan aman tanpa error
                 document.getElementById('nama-toko').innerText = data.nama_burjo;
                 document.getElementById('display-id').innerText = burjoId;
 
-                // REAL-TIME LOGO HEADER
                 const logoContainer = document.getElementById('logo-container');
                 if (data.foto_profil) {
                     logoContainer.innerHTML = `<img src="${data.foto_profil}" class="w-full h-full object-cover">`;
@@ -109,19 +125,16 @@
                 }
 
                 listMejaTerpakai = data.meja_aktif || []; 
-                // Kirim array deskripsi_meja ke fungsi render
-                renderMeja(listMejaTerpakai, data.detail_meja || [], data.deskripsi_meja || []);
+                listDetailMeja = data.detail_meja || []; 
+                renderMeja(listMejaTerpakai, listDetailMeja, data.deskripsi_meja || []);
             }
         });
 
         function renderMeja(listTerpakai, detailUser, deskripsiMeja) {
             const container = document.getElementById('container-meja');
-            
-            // 1. KUNCI POSISI SCROLL: Amankan posisi horizontal kontainer dan vertikal layar halaman
             const simpanScrollX = container.scrollLeft;
             const simpanScrollY = window.scrollY;
 
-            // 2. KUNCI TINGGI ELEMEN: Cegah halaman menyusut (collapse) saat innerHTML dikosongkan
             container.style.minHeight = `${container.offsetHeight}px`;
 
             const totalMeja = deskripsiMeja.length ? deskripsiMeja.length : 10;
@@ -148,19 +161,60 @@
                     </div>`;
             }
 
-            // 3. KEMBALIKAN POSISI SCROLL: Kembalikan posisi scroll tepat setelah render HTML selesai
             container.scrollLeft = simpanScrollX;
             window.scrollTo(window.scrollX, simpanScrollY);
-            
-            // 4. LEPASKAN KUNCI TINGGI: Reset minHeight agar kontainer bisa berkembang/mengecil secara normal lagi
             container.style.minHeight = "";
         }
 
         window.prosesMeja = async (nomor, aksi) => {
             let newList = [...listMejaTerpakai];
-            if (aksi === 'lepas') newList = newList.filter(n => n !== nomor);
-            else if (!newList.includes(nomor)) newList.push(nomor);
-            await updateDoc(docRef, { meja_aktif: newList, status_meja: newList.length.toString() });
+            let newDetail = [...listDetailMeja];
+            const nomorAngka = parseInt(nomor);
+
+            if (aksi === 'lepas') {
+                newList = newList.filter(n => parseInt(n) !== nomorAngka);
+                newDetail = newDetail.filter(d => parseInt(d.nomor) !== nomorAngka);
+            } else if (aksi === 'isi') {
+                if (!newList.map(n => parseInt(n)).includes(nomorAngka)) {
+                    newList.push(nomorAngka);
+                    newDetail.push({ nomor: nomorAngka, user: "Pelanggan (Manual)" });
+                }
+            }
+
+            await updateDoc(docRef, {
+                meja_aktif: newList,
+                status_meja: newList.length.toString(),
+                detail_meja: newDetail
+            });
+        };
+
+        // FUNGSI AKSI MENGHAPUS BURJO DARI DATABASE
+        window.pemicuHapusBurjo = async () => {
+            if (!dataBurjoSekarang) return alert("Data belum termuat sepenuhnya.");
+
+            const konfirmasiPertama = confirm(`Apakah Anda yakin ingin menghapus "${dataBurjoSekarang.nama_burjo}"?\nTindakan ini tidak dapat dibatalkan.`);
+            if (!konfirmasiPertama) return;
+
+            const inputPin = prompt("Untuk keamanan, silakan masukkan 4 digit PIN warung Anda:");
+            if (inputPin === null) return; 
+
+            const pinBenar = dataBurjoSekarang.pin ? dataBurjoSekarang.pin.toString() : "";
+            
+            if (inputPin === pinBenar) {
+                const konfirmasiFinal = confirm("Peringatan Terakhir! Klik 'OK' untuk menghapus permanen.");
+                if (!konfirmasiFinal) return;
+
+                try {
+                    await deleteDoc(docRef);
+                    alert("Warung Burjo Anda berhasil dihapus dari sistem.");
+                    localStorage.removeItem("myburjo_penjual_id");
+                    window.location.href = "login-penjual.html";
+                } catch (error) {
+                    alert("Gagal menghapus data: " + error.message);
+                }
+            } else {
+                alert("PIN Keamanan salah! Proses penghapusan digagalkan.");
+            }
         };
     </script>
 </body>

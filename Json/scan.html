@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
@@ -31,6 +31,8 @@
     <main class="px-5 mt-8 flex flex-col items-center">
         <div class="w-full max-w-sm shadow-xl shadow-[#ffd700]/10 rounded-[24px]">
             <div id="reader"></div>
+            
+            <div id="file-reader-dummy" class="hidden"></div>
         </div>
 
         <p class="mt-6 text-center text-[#7e7760] text-sm font-semibold max-w-[280px]">
@@ -60,6 +62,17 @@
         </a>
     </nav>
 
+    <div id="popup-scan" class="fixed inset-0 bg-black/70 z-[300] hidden items-center justify-center px-6 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-[32px] p-6 text-center space-y-4 shadow-2xl transition-transform duration-200 ease-out">
+            <div id="popup-icon" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl"></div>
+            <h2 id="popup-title" class="font-extrabold text-2xl text-[#1f1b11]"></h2>
+            <p id="popup-subtitle" class="text-sm font-semibold text-[#7e7760] px-2"></p>
+            <button onclick="tutupPopupDanSelesai()" class="w-full bg-[#ffd700] text-[#705d00] py-4 rounded-2xl font-black text-sm border-2 border-[#1f1b11] shadow-[0_4px_0_#1f1b11] active:translate-y-1 active:shadow-none transition-all">
+                SCAN MEJA LAIN
+            </button>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -79,67 +92,132 @@
         async function prosesHasilScan(decodedText) {
             if(isProcessing) return;
             isProcessing = true;
-            
-            try {
-                if (html5QrcodeScanner.getState() === 2) { 
-                    html5QrcodeScanner.pause(true); 
-                }
-            } catch (err) { }
 
-            const dataQR = decodedText.split("-");
-            
-            if(dataQR.length < 2) {
-                alert("Format QR tidak dikenali. Pastikan ini QR dari meja MyBurjo.");
-                window.location.reload(); // Otomatis reset kamera
+            const cleanText = decodedText.trim();
+
+            if (!cleanText.startsWith("MYBURJO")) {
+                tampilkanPopupHasil("gagal", "Format QR Code tidak dikenali oleh sistem MYBURJO!");
                 return;
             }
 
-            const burjoId = dataQR[0]; 
-            const nomorMeja = dataQR[1]; 
+            const parts = cleanText.split("-");
+            if (parts.length < 4) {
+                tampilkanPopupHasil("gagal", "Format QR tidak dikenali. Pastikan ini QR dari meja MyBurjo.");
+                return;
+            }
+
+            const burjoId = parts[1];
+            const nomorMeja = parseInt(parts[3]);
+            if (!burjoId || Number.isNaN(nomorMeja)) {
+                tampilkanPopupHasil("gagal", "Format QR tidak dikenali. Pastikan ini QR dari meja MyBurjo.");
+                return;
+            }
             
             try {
                 const ref = doc(db, "penjual", burjoId);
                 const snap = await getDoc(ref);
                 
-                if(snap.exists()) {
-                    let terpakai = parseInt(snap.data().status_meja);
-                    const statusCheckinKamu = localStorage.getItem('myburjo_checkin');
-
-                    if(statusCheckinKamu === burjoId) {
-                        if(terpakai > 0) terpakai--;
-                        await updateDoc(ref, { status_meja: terpakai.toString() });
-                        localStorage.removeItem('myburjo_checkin');
-                        alert(`Dadah ${username}! Berhasil Check-out dari Meja ${nomorMeja}.`);
-                    } else {
-                        if(terpakai < 10) {
-                            terpakai++;
-                            await updateDoc(ref, { status_meja: terpakai.toString() });
-                            localStorage.setItem('myburjo_checkin', burjoId);
-                            alert(`Yeay ${username}! Berhasil Check-in di Meja ${nomorMeja}. Selamat makan!`);
-                        } else {
-                            alert("Yah! Burjo ini mejanya lagi penuh semua.");
-                            window.location.reload(); // Otomatis reset kamera
-                            return;
-                        }
-                    }
-                } else {
-                    alert("QR Code tidak valid. Burjo tidak ditemukan di database.");
-                    window.location.reload(); // Otomatis reset kamera
+                if (!snap.exists()) {
+                    tampilkanPopupHasil("gagal", "Burjo tidak ditemukan di database.");
                     return;
+                }
+
+                const data = snap.data();
+                const currentMejaAktif = data.meja_aktif || [];
+                const currentDetailMeja = data.detail_meja || [];
+                const namaPelanggan = localStorage.getItem('myburjo_username') || 'Pelanggan Anonim';
+                const apakahMejaTerisiDiDB = currentMejaAktif.map(n => parseInt(n)).includes(nomorMeja);
+
+                if (!apakahMejaTerisiDiDB) {
+                    currentMejaAktif.push(nomorMeja);
+                    currentDetailMeja.push({ nomor: nomorMeja, user: namaPelanggan });
+
+                    await updateDoc(ref, {
+                        meja_aktif: currentMejaAktif,
+                        status_meja: currentMejaAktif.length.toString(),
+                        detail_meja: currentDetailMeja
+                    });
+
+                    localStorage.setItem('myburjo_checkin', burjoId);
+                    tampilkanPopupHasil("checkin", `Meja ${nomorMeja.toString().padStart(2, '0')}`);
+                    return;
+                }
+
+                const dataMejaIni = currentDetailMeja.find(d => parseInt(d.nomor) === nomorMeja);
+                const namaPemakaiDiDB = dataMejaIni?.user || '';
+
+                if (namaPemakaiDiDB === namaPelanggan) {
+                    const updatedMejaAktif = currentMejaAktif.filter(n => parseInt(n) !== nomorMeja);
+                    const updatedDetailMeja = currentDetailMeja.filter(d => parseInt(d.nomor) !== nomorMeja);
+
+                    await updateDoc(ref, {
+                        meja_aktif: updatedMejaAktif,
+                        status_meja: updatedMejaAktif.length.toString(),
+                        detail_meja: updatedDetailMeja
+                    });
+
+                    localStorage.removeItem('myburjo_checkin');
+                    tampilkanPopupHasil("checkout", `Meja ${nomorMeja.toString().padStart(2, '0')}`);
+                } else {
+                    tampilkanPopupHasil("terpakai", `Meja ${nomorMeja.toString().padStart(2, '0')}`);
                 }
             } catch(e) {
                 console.error(e);
-                alert("Terjadi kesalahan jaringan.");
-                window.location.reload(); // Otomatis reset kamera
-                return;
+                tampilkanPopupHasil("gagal", "Terjadi masalah saat memproses data server.");
             }
-            window.location.href = "index.html"; 
         }
 
+        // Inisialisasi Utama Kamera Live Scanner
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
         html5QrcodeScanner.render((text) => prosesHasilScan(text), (err) => { });
 
-        const html5QrCode = new window.Html5Qrcode("reader");
+        function tampilkanPopupHasil(tipe, detailInfo) {
+            const popup = document.getElementById('popup-scan');
+            const iconBox = document.getElementById('popup-icon');
+            const titleBox = document.getElementById('popup-title');
+            const subtitleBox = document.getElementById('popup-subtitle');
+
+            iconBox.className = "w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl ";
+
+            if (tipe === "checkin") {
+                iconBox.innerHTML = "🎉";
+                iconBox.classList.add("bg-green-50", "text-green-600");
+                titleBox.innerText = "Yeay! Berhasil Check-in";
+                subtitleBox.innerText = `Kamu berhasil mendaftarkan diri di ${detailInfo}. Silakan scan meja lain jika perlu.`;
+            } else if (tipe === "checkout") {
+                iconBox.innerHTML = "👋";
+                iconBox.classList.add("bg-amber-50", "text-amber-600");
+                titleBox.innerText = "Dadah! Berhasil Check-out";
+                subtitleBox.innerText = `Akses kamu di ${detailInfo} telah dinonaktifkan. Silakan scan meja lain.`;
+            } else if (tipe === "terpakai") {
+                iconBox.innerHTML = "⚠️";
+                iconBox.classList.add("bg-red-50", "text-red-600");
+                titleBox.innerText = "Yah! Meja masih dipake";
+                subtitleBox.innerText = `${detailInfo} masih digunakan orang lain. Coba meja lain.`;
+            } else {
+                iconBox.innerHTML = "❌";
+                iconBox.classList.add("bg-gray-100", "text-gray-600");
+                titleBox.innerText = "Proses Gagal";
+                subtitleBox.innerText = detailInfo;
+            }
+
+            popup.classList.remove('hidden');
+            popup.classList.add('flex');
+        }
+
+        window.tutupPopupDanSelesai = function() {
+            const popup = document.getElementById('popup-scan');
+            popup.classList.add('hidden');
+            popup.classList.remove('flex');
+            
+            // Jeda 1.5 detik sebelum gembok dibuka agar kamera tidak memindai instan objek yang sama
+            setTimeout(() => {
+                isProcessing = false;
+            }, 1500);
+        }
+
+        // AMAN & BEBAS BENTROK: Inisialisasi engine khusus galeri pada div dummy terpisah
+        const html5QrCode = new window.Html5Qrcode("file-reader-dummy");
         const fileInput = document.getElementById('file-qr');
         
         document.getElementById('btn-scan-galeri').addEventListener('click', () => {
@@ -155,8 +233,7 @@
                     prosesHasilScan(decodedText);
                 })
                 .catch(err => {
-                    alert("QR Code tidak terbaca. Pastikan gambarnya jelas ya.");
-                    window.location.reload(); // Otomatis reset kamera
+                    tampilkanPopupHasil("gagal", "QR Code tidak terbaca. Pastikan gambarnya jelas ya.");
                 });
             
             e.target.value = ""; 
