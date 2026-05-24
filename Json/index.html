@@ -80,22 +80,23 @@
         <p class="text-center text-[#7e7760] py-10 animate-pulse italic">Mencari Burjo favoritmu...</p>
     </main>
 
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t py-2 flex justify-around items-center z-[100] shadow-lg">
-        <a href="index.html" class="text-[#705d00] flex flex-col items-center gap-0.5 active:scale-95 transition-all">
-            <span class="material-symbols-outlined text-2xl">home</span>
-            <span class="text-[10px] font-bold">Laman Utama</span>
-        </a>
-        <a href="scan.html" class="flex flex-col items-center gap-0.5 active:scale-95 transition-all relative">
-            <div class="bg-[#ffd700] text-[#1f1b11] w-12 h-12 rounded-full -mt-6 flex items-center justify-center shadow-md border-4 border-white">
-                <span class="material-symbols-outlined text-xl">qr_code_scanner</span>
-            </div>
-            <span class="text-[10px] font-bold text-[#7e7760] mt-1">QR</span>
-        </a>
-        <a href="profile.html" class="text-[#7e7760] flex flex-col items-center gap-0.5 active:scale-95 transition-all">
-            <span class="material-symbols-outlined text-2xl">person</span>
-            <span class="text-[10px] font-bold">Profil</span>
-        </a>
-    </nav>
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#f5eddb] h-20 flex justify-around items-center z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.03)] px-6">
+    <a href="index.html" class="flex flex-col items-center gap-1 text-[#d1c8b4] hover:text-[#705d00] transition-colors">
+        <span class="material-symbols-outlined text-2xl">home</span>
+        <span class="text-[10px] font-bold">Home</span>
+    </a>
+
+    <a href="scan.html" class="relative -top-5">
+        <div class="bg-[#ffd700] text-[#1f1b11] w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-white active:scale-95 transition-transform">
+            <span class="material-symbols-outlined text-2xl">qr_code_scanner</span>
+        </div>
+    </a>
+
+    <a href="profile.html" class="flex flex-col items-center gap-1 text-[#d1c8b4] hover:text-[#705d00] transition-colors">
+        <span class="material-symbols-outlined text-2xl">person</span>
+        <span class="text-[10px] font-bold">Profil</span>
+    </a>
+</nav>
 
     <script>
         const splash = document.getElementById('splash-screen');
@@ -150,10 +151,30 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        function getStatus(mejaTerpakai, totalMeja = 10) {
-            const terpakai = parseInt(mejaTerpakai) || 0;
+        function getStatus(dataBurjo) {
+            // 1. Ambil total meja secara dinamis dari database (jika tidak ada, default 10)
+            const totalMeja = (dataBurjo.deskripsi_meja && Array.isArray(dataBurjo.deskripsi_meja))
+                ? dataBurjo.deskripsi_meja.length
+                : 10;
+
+            // 2. Cek berapa meja yang sedang dipakai
+            let terpakai = 0;
+            if (dataBurjo.meja_aktif && Array.isArray(dataBurjo.meja_aktif)) {
+                terpakai = dataBurjo.meja_aktif.length;
+            } else if (dataBurjo.status_meja) {
+                const strStatus = String(dataBurjo.status_meja);
+                if (strStatus.includes('/')) {
+                    terpakai = parseInt(strStatus.split('/')[0]) || 0;
+                } else {
+                    terpakai = parseInt(strStatus) || 0;
+                }
+            }
+
+            if (terpakai < 0) terpakai = 0;
+            if (terpakai > totalMeja) terpakai = totalMeja;
+
             const tersedia = totalMeja - terpakai;
-            const persen = totalMeja > 0 ? (terpakai / totalMeja) * 100 : 0;
+            const persen = totalMeja === 0 ? 0 : (terpakai / totalMeja) * 100;
             let config = { tableText: `${tersedia}/${totalMeja} TERSEDIA`, crowdText: "", style: "" };
             
             if (persen <= 25) { config.crowdText = "SEPI"; config.style = "bg-[#e8f5e9] text-[#2e7d32] border-[#c8e6c9]"; }
@@ -170,7 +191,6 @@
 
             if (!snap) return;
 
-            // 1. Tampung data ke dalam array sementara
             let daftarBurjo = [];
 
             snap.forEach(doc => {
@@ -178,9 +198,7 @@
                 if (s && !d.nama_burjo.toLowerCase().includes(s.toLowerCase())) return;
 
                 const lat = d.lokasi.latitude, lng = d.lokasi.longitude;
-                
-                // Hitung jarak sebagai angka mutlak untuk bahan sorting
-                let nilaiJarak = 999999; // Default besar jika GPS belum nyala
+                let nilaiJarak = 999999; 
                 let teksJarak = "--";
 
                 if (userPos) {
@@ -188,34 +206,23 @@
                     nilaiJarak = parseFloat(jarakDihitung);
                     teksJarak = jarakDihitung;
                 }
-                
-                daftarBurjo.push({
-                    id: doc.id,
-                    ...d,
-                    lat: lat,
-                    lng: lng,
-                    nilaiJarak: nilaiJarak,
-                    teksJarak: teksJarak
-                });
+
+                daftarBurjo.push({ id: doc.id, ...d, lat, lng, nilaiJarak, teksJarak });
             });
 
-            // 2. Proses Sorting: Urutkan array berdasarkan nilaiJarak terkecil ke terbesar
             daftarBurjo.sort((a, b) => a.nilaiJarak - b.nilaiJarak);
 
-            // 3. Render HTML dari array yang sudah berurut
             daftarBurjo.forEach(d => {
-                const st = getStatus(d.status_meja);
-                
+                // Mengambil status dari seluruh data (d), bukan sekadar string
+                const st = getStatus(d);
+
                 L.circleMarker([d.lat, d.lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
                  .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
 
-                // --- PERBAIKAN: Deteksi berbagai kemungkinan nama field foto di Firebase ---
                 const linkFoto = d.photo_url || d.foto_profil || d.foto || d.gambar || d.profile_picture || d.image_url;
-
                 const htmlThumbnail = linkFoto
                     ? `<img src="${linkFoto}" alt="${d.nama_burjo}" class="w-14 h-16 rounded-2xl object-cover border border-[#f0e7d6]" />`
                     : `<div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6]"><span class="material-symbols-outlined text-3xl">soup_kitchen</span></div>`;
-                // --------------------------------------------------------------------------
 
                 container.innerHTML += `
                     <div class="bg-white card-radius p-5 ambient-shadow border border-[#f5eddb] flex flex-col gap-4 relative">
@@ -229,11 +236,11 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="fokusPeta(${d.lat}, ${d.lng})" class="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-50 text-[#705d00] border border-orange-100 shadow-sm active:scale-95 transition-all"><span class="material-symbols-outlined">location_on</span></button>
-                                
-                                <div class="flex flex-col items-center border p-2 rounded-xl min-w-[100px] ${st.style} shadow-sm">
-                                    <span class="text-[9px] font-extrabold tracking-tighter">${st.tableText}</span>
-                                    <div class="w-full h-[1px] bg-current opacity-20 my-1"></div>
-                                    <span class="text-[10px] font-black">${st.crowdText}</span>
+
+                                <div class="flex flex-col items-center justify-center border p-2 rounded-xl min-w-[100px] ${st.style} shadow-sm leading-none">
+                                    <span class="text-[10px] font-extrabold tracking-tight mb-1">${st.tableText}</span>
+                                    <div class="w-full border-b border-current opacity-20"></div>
+                                    <span class="text-[11px] font-black mt-1">${st.crowdText}</span>
                                 </div>
                             </div>
                         </div>

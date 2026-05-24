@@ -47,20 +47,23 @@
         <input type="file" id="file-qr" accept="image/*" class="hidden">
     </main>
 
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t h-20 flex justify-around items-center z-[100] shadow-lg">
-        <a href="index.html" class="text-[#7e7760] flex flex-col items-center active:scale-95 transition-all">
-            <span class="material-symbols-outlined">home</span>
-        </a>
-        
-        <div class="bg-[#ffd700] text-[#1f1b11] w-14 h-14 rounded-full -mt-10 flex items-center justify-center shadow-lg border-4 border-white cursor-pointer relative">
-            <span class="material-symbols-outlined">qr_code_scanner</span>
-            <div class="w-1 h-1 bg-[#ffd700] rounded-full mt-1 absolute -bottom-3"></div>
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#f5eddb] h-20 flex justify-around items-center z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.03)] px-6">
+    <a href="index.html" class="flex flex-col items-center gap-1 text-[#d1c8b4] hover:text-[#705d00] transition-colors">
+        <span class="material-symbols-outlined text-2xl">home</span>
+        <span class="text-[10px] font-bold">Home</span>
+    </a>
+
+    <a href="scan.html" class="relative -top-5">
+        <div class="bg-[#ffd700] text-[#1f1b11] w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-white active:scale-95 transition-transform">
+            <span class="material-symbols-outlined text-2xl">qr_code_scanner</span>
         </div>
-        
-        <a href="profile.html" class="text-[#7e7760] flex flex-col items-center active:scale-95 transition-all">
-            <span class="material-symbols-outlined">person</span>
-        </a>
-    </nav>
+    </a>
+
+    <a href="profile.html" class="flex flex-col items-center gap-1 text-[#d1c8b4] hover:text-[#705d00] transition-colors">
+        <span class="material-symbols-outlined text-2xl">person</span>
+        <span class="text-[10px] font-bold">Profil</span>
+    </a>
+</nav>
 
     <div id="popup-scan" class="fixed inset-0 bg-black/70 z-[300] hidden items-center justify-center px-6 backdrop-blur-sm">
         <div class="bg-white w-full max-w-sm rounded-[32px] p-6 text-center space-y-4 shadow-2xl transition-transform duration-200 ease-out">
