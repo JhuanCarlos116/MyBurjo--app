@@ -168,34 +168,67 @@
             container.innerHTML = "";
             markerGroup.clearLayers();
 
+            if (!snap) return;
+
+            // 1. Tampung data ke dalam array sementara
+            let daftarBurjo = [];
+
             snap.forEach(doc => {
                 const d = doc.data();
                 if (s && !d.nama_burjo.toLowerCase().includes(s.toLowerCase())) return;
 
-                const totalMeja = d.deskripsi_meja ? d.deskripsi_meja.length : 10;
-                const st = getStatus(d.status_meja, totalMeja);
                 const lat = d.lokasi.latitude, lng = d.lokasi.longitude;
-                const jarak = userPos ? hitungJarak(userPos.lat, userPos.lng, lat, lng) : "--";
                 
-                const imgProfileUrl = d.foto_profil || '';
+                // Hitung jarak sebagai angka mutlak untuk bahan sorting
+                let nilaiJarak = 999999; // Default besar jika GPS belum nyala
+                let teksJarak = "--";
 
-                L.circleMarker([lat, lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
+                if (userPos) {
+                    const jarakDihitung = hitungJarak(userPos.lat, userPos.lng, lat, lng);
+                    nilaiJarak = parseFloat(jarakDihitung);
+                    teksJarak = jarakDihitung;
+                }
+                
+                daftarBurjo.push({
+                    id: doc.id,
+                    ...d,
+                    lat: lat,
+                    lng: lng,
+                    nilaiJarak: nilaiJarak,
+                    teksJarak: teksJarak
+                });
+            });
+
+            // 2. Proses Sorting: Urutkan array berdasarkan nilaiJarak terkecil ke terbesar
+            daftarBurjo.sort((a, b) => a.nilaiJarak - b.nilaiJarak);
+
+            // 3. Render HTML dari array yang sudah berurut
+            daftarBurjo.forEach(d => {
+                const st = getStatus(d.status_meja);
+                
+                L.circleMarker([d.lat, d.lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
                  .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
+
+                // --- PERBAIKAN: Deteksi berbagai kemungkinan nama field foto di Firebase ---
+                const linkFoto = d.photo_url || d.foto_profil || d.foto || d.gambar || d.profile_picture || d.image_url;
+
+                const htmlThumbnail = linkFoto
+                    ? `<img src="${linkFoto}" alt="${d.nama_burjo}" class="w-14 h-16 rounded-2xl object-cover border border-[#f0e7d6]" />`
+                    : `<div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6]"><span class="material-symbols-outlined text-3xl">soup_kitchen</span></div>`;
+                // --------------------------------------------------------------------------
 
                 container.innerHTML += `
                     <div class="bg-white card-radius p-5 ambient-shadow border border-[#f5eddb] flex flex-col gap-4 relative">
                         <div class="flex justify-between items-start">
                             <div class="flex gap-4">
-                                <div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6] overflow-hidden">
-                                    ${imgProfileUrl ? `<img src="${imgProfileUrl}" alt="${d.nama_burjo}" class="w-full h-full object-cover">` : `<span class="material-symbols-outlined text-3xl">soup_kitchen</span>`}
-                                </div>
+                                ${htmlThumbnail}
                                 <div>
                                     <h2 class="font-bold text-xl text-[#1f1b11]">${d.nama_burjo}</h2>
-                                    <p class="text-xs text-[#7e7760] mt-1 font-semibold italic">📍 ${jarak} km dari kamu</p>
+                                    <p class="text-xs text-[#7e7760] mt-1 font-semibold italic">📍 ${d.teksJarak} km dari kamu</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="fokusPeta(${lat}, ${lng})" class="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-50 text-[#705d00] border border-orange-100 shadow-sm active:scale-95 transition-all"><span class="material-symbols-outlined">location_on</span></button>
+                                <button onclick="fokusPeta(${d.lat}, ${d.lng})" class="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-50 text-[#705d00] border border-orange-100 shadow-sm active:scale-95 transition-all"><span class="material-symbols-outlined">location_on</span></button>
                                 
                                 <div class="flex flex-col items-center border p-2 rounded-xl min-w-[100px] ${st.style} shadow-sm">
                                     <span class="text-[9px] font-extrabold tracking-tighter">${st.tableText}</span>
@@ -204,7 +237,7 @@
                                 </div>
                             </div>
                         </div>
-                        <a href="menu.html?id=${doc.id}" class="w-full bg-[#ffd700] text-[#1f1b11] py-4 rounded-2xl font-bold text-center shadow-md active:scale-95 transition-all">Lihat Menu & Meja</a>
+                        <a href="menu.html?id=${d.id}" class="w-full bg-[#ffd700] text-[#1f1b11] py-4 rounded-2xl font-bold text-center shadow-md active:scale-95 transition-all">Lihat Menu & Meja</a>
                     </div>`;
             });
         }
