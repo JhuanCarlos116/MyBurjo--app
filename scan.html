@@ -68,7 +68,8 @@
             </div>
             <h2 id="alert-title" class="font-extrabold text-xl text-[#1f1b11] mb-2">Judul</h2>
             <p id="alert-message" class="text-sm font-medium text-[#7e7760] mb-6">Pesan detail akan muncul di sini.</p>
-            <button id="btn-alert-close" class="w-full bg-[#ffd700] text-[#705d00] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all">Mengerti</button>
+            
+            <button type="button" id="btn-alert-close" class="w-full bg-[#ffd700] text-[#705d00] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all">Mengerti</button>
         </div>
     </div>
 
@@ -85,17 +86,15 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // KUNCI UTAMA: Flag pengunci agar tidak melakukan ganda scan saat pop-up terbuka
+        // KUNCI UTAMA: Flag pengunci agar tidak melakukan ganda scan
         let isProcessing = false; 
-        let fungsiCallbackTutup = null;
 
-        window.tampilkanPopup = (judul, pesan, tipe = 'info', callback = null) => {
+        window.tampilkanPopup = (judul, pesan, tipe = 'info') => {
             document.getElementById('alert-title').innerText = judul;
             document.getElementById('alert-message').innerText = pesan;
             
             const icon = document.getElementById('alert-icon');
             const container = document.getElementById('alert-icon-container');
-            fungsiCallbackTutup = callback;
             
             if(tipe === 'sukses') {
                 icon.innerText = "check_circle";
@@ -123,12 +122,16 @@
             const box = document.getElementById('alert-box');
             modal.classList.add('opacity-0');
             box.classList.add('scale-90');
+            
             setTimeout(() => {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
-                // Jalankan callback pembebasan lock kamera
-                if (fungsiCallbackTutup) fungsiCallbackTutup();
-                isProcessing = false; 
+                
+                // PERBAIKAN 2: Berikan jeda Cooldown 2 Detik.
+                // Ini memberi kamu waktu untuk menggeser HP dari QR code setelah pop-up tertutup.
+                setTimeout(() => {
+                    isProcessing = false; 
+                }, 2000);
             }, 300);
         };
 
@@ -143,9 +146,8 @@
                 { facingMode: "environment" }, 
                 configKamera, 
                 (decodedText) => {
-                    // Jika sedang menampilkan pop-up hasil scan sebelumnya, abaikan frame gambar baru
                     if (isProcessing) return; 
-                    isProcessing = true;
+                    isProcessing = true; // Kunci sistem scan seketika
                     prosesDataQR(decodedText);
                 },
                 (errorMessage) => { /* scanning framework... */ }
@@ -167,7 +169,8 @@
                     prosesDataQR(decodedText);
                 })
                 .catch(err => {
-                    tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error", () => { isProcessing = false; });
+                    tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error");
+                    isProcessing = false; // Buka kunci jika error baca gambar
                 });
                 e.target.value = ""; 
             });
@@ -196,10 +199,8 @@
                         const indexMejaTerpakai = mejaAktif.indexOf(nomorMeja);
                         const infoUserDiMeja = detailMeja.find(d => d.nomor == nomorMeja);
 
-                        // 1. KONDISI SUDAH TERPAKAI
                         if (indexMejaTerpakai > -1) {
                             if (infoUserDiMeja && infoUserDiMeja.user === currentUsername) {
-                                // SCAN ULANG OLEH USER SAMA -> BERHASIL CHECK-OUT
                                 mejaAktif = mejaAktif.filter(n => n !== nomorMeja);
                                 detailMeja = detailMeja.filter(d => d.nomor != nomorMeja);
 
@@ -209,15 +210,11 @@
                                     status_meja: mejaAktif.length.toString()
                                 });
 
-                                // Callback sengaja dikosongkan agar pengguna tetap di halaman ini tanpa mental ke home
-                                tampilkanPopup("Dadah!", "Berhasil Check-out", "info");
+                                tampilkanPopup("Dadah!", "Berhasil Check-out. Meja sudah dikosongkan.", "info");
                             } else {
-                                // SCAN MEJA MILIK ORANG LAIN -> GAGAL CHECK-IN
-                                tampilkanPopup("Yah!", "mejanya masih dipake", "error");
+                                tampilkanPopup("Yah!", "Mejanya masih dipake sama orang lain.", "error");
                             }
-                        } 
-                        // 2. KONDISI KOSONG -> BERHASIL CHECK-IN
-                        else {
+                        } else {
                             mejaAktif.push(nomorMeja);
                             detailMeja = detailMeja.filter(d => d.nomor != nomorMeja);
                             detailMeja.push({ nomor: nomorMeja, user: currentUsername });
@@ -228,7 +225,7 @@
                                 status_meja: mejaAktif.length.toString()
                             });
 
-                            tampilkanPopup("Yeay!", "Berhasil Check-in", "sukses");
+                            tampilkanPopup("Yeay!", "Berhasil Check-in. Selamat menikmati pesananmu!", "sukses");
                         }
                     } else {
                         tampilkanPopup("Warung Tidak Ada", "ID Mitra Burjo tidak terdaftar.", "error");
