@@ -81,9 +81,9 @@
     </main>
 
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#f5eddb] h-20 flex justify-around items-center z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.03)] px-6">
-    <a href="index.html" class="flex flex-col items-center gap-1 text-[#d1c8b4] hover:text-[#705d00] transition-colors">
-        <span class="material-symbols-outlined text-2xl">home</span>
-        <span class="text-[10px] font-bold">Home</span>
+    <a href="index.html" class="flex flex-col items-center gap-1 text-[#705d00] transition-colors">
+        <span class="material-symbols-outlined text-2xl font-bold">home</span>
+        <span class="text-[10px] font-extrabold">Home</span>
     </a>
 
     <a href="scan.html" class="relative -top-5">
@@ -186,10 +186,13 @@
 
         function render(snap, s = "") {
             const container = document.getElementById('daftar-burjo');
-            container.innerHTML = "";
-            markerGroup.clearLayers();
+            const posisiScroll = window.scrollY;
 
-            if (!snap) return;
+            markerGroup.clearLayers();
+            if (!snap) {
+                container.innerHTML = "";
+                return;
+            }
 
             let daftarBurjo = [];
 
@@ -198,7 +201,7 @@
                 if (s && !d.nama_burjo.toLowerCase().includes(s.toLowerCase())) return;
 
                 const lat = d.lokasi.latitude, lng = d.lokasi.longitude;
-                let nilaiJarak = 999999; 
+                let nilaiJarak = 999999;
                 let teksJarak = "--";
 
                 if (userPos) {
@@ -212,19 +215,24 @@
 
             daftarBurjo.sort((a, b) => a.nilaiJarak - b.nilaiJarak);
 
+            let htmlKonten = "";
+
+            if (daftarBurjo.length === 0) {
+                htmlKonten = `<p class="text-center text-[#7e7760] py-10 font-medium">Tidak ada Burjo yang ditemukan.</p>`;
+            }
+
             daftarBurjo.forEach(d => {
-                // Mengambil status dari seluruh data (d), bukan sekadar string
                 const st = getStatus(d);
 
                 L.circleMarker([d.lat, d.lng], { radius: 8, fillColor: "#705d00", color: "#fff", weight: 2, fillOpacity: 1 }).addTo(markerGroup)
-                 .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
+                    .bindTooltip(d.nama_burjo, { permanent: true, direction: 'top', className: 'custom-tooltip' });
 
                 const linkFoto = d.photo_url || d.foto_profil || d.foto || d.gambar || d.profile_picture || d.image_url;
                 const htmlThumbnail = linkFoto
                     ? `<img src="${linkFoto}" alt="${d.nama_burjo}" class="w-14 h-16 rounded-2xl object-cover border border-[#f0e7d6]" />`
                     : `<div class="w-14 h-16 bg-[#fff9ef] rounded-2xl flex items-center justify-center text-[#705d00] border border-[#f0e7d6]"><span class="material-symbols-outlined text-3xl">soup_kitchen</span></div>`;
 
-                container.innerHTML += `
+                htmlKonten += `
                     <div class="bg-white card-radius p-5 ambient-shadow border border-[#f5eddb] flex flex-col gap-4 relative">
                         <div class="flex justify-between items-start">
                             <div class="flex gap-4">
@@ -247,15 +255,95 @@
                         <a href="menu.html?id=${d.id}" class="w-full bg-[#ffd700] text-[#1f1b11] py-4 rounded-2xl font-bold text-center shadow-md active:scale-95 transition-all">Lihat Menu & Meja</a>
                     </div>`;
             });
+
+            container.innerHTML = htmlKonten;
+            window.scrollTo(0, posisiScroll);
         }
 
+        window.mintaLokasi = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (p) => {
+                        userPos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                        L.marker([userPos.lat, userPos.lng], {
+                            icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/1673/1673188.png', iconSize: [30, 30] })
+                        }).addTo(map);
+
+                        if (lastSnap) render(lastSnap, term);
+                    },
+                    (error) => {
+                        console.warn("Lokasi gagal didapat:", error);
+                        tampilkanPopup(
+                            "Lokasi Dibutuhkan",
+                            "Pastikan GPS kamu menyala agar kami bisa mencarikan Burjo terdekat.",
+                            "error"
+                        );
+
+                        if (lastSnap) render(lastSnap, term);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                tampilkanPopup(
+                    "Browser Tidak Mendukung",
+                    "Browser HP kamu tidak mendukung fitur lokasi.",
+                    "error"
+                );
+            }
+        };
+
+        mintaLokasi();
         onSnapshot(collection(db, "penjual"), s => { lastSnap = s; render(s, term); });
-        navigator.geolocation.getCurrentPosition(p => { 
-            userPos = { lat: p.coords.latitude, lng: p.coords.longitude }; 
-            L.marker([userPos.lat, userPos.lng], {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/1673/1673188.png', iconSize: [30, 30]})}).addTo(map);
-            if(lastSnap) render(lastSnap, term); 
-        });
         document.getElementById('search-input').addEventListener('input', e => { term = e.target.value; render(lastSnap, term); });
+    </script>
+
+    <div id="custom-alert" class="fixed inset-0 bg-[#1f1b11]/80 z-[200] hidden items-center justify-center px-6 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 flex flex-col items-center text-center shadow-2xl transform scale-90 transition-transform duration-300" id="alert-box">
+            <div id="alert-icon-container" class="w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <span id="alert-icon" class="material-symbols-outlined text-4xl">info</span>
+            </div>
+            <h2 id="alert-title" class="font-extrabold text-xl text-[#1f1b11] mb-2">Judul</h2>
+            <p id="alert-message" class="text-sm font-medium text-[#7e7760] mb-6">Pesan detail akan muncul di sini.</p>
+            <button onclick="tutupPopup()" class="w-full bg-[#ffd700] text-[#705d00] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all">Mengerti</button>
+        </div>
+    </div>
+
+    <script>
+        window.tampilkanPopup = (judul, pesan, tipe = 'info') => {
+            document.getElementById('alert-title').innerText = judul;
+            document.getElementById('alert-message').innerText = pesan;
+            const icon = document.getElementById('alert-icon');
+            const container = document.getElementById('alert-icon-container');
+            if(tipe === 'sukses') {
+                icon.innerText = "check_circle";
+                container.className = "w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-green-100 text-green-600";
+            } else if(tipe === 'error') {
+                icon.innerText = "warning";
+                container.className = "w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-red-100 text-red-600";
+            } else {
+                icon.innerText = "location_on";
+                container.className = "w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-[#fff9ef] text-[#705d00]";
+            }
+            const modal = document.getElementById('custom-alert');
+            const box = document.getElementById('alert-box');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                box.classList.remove('scale-90');
+            }, 10);
+        };
+
+        window.tutupPopup = () => {
+            const modal = document.getElementById('custom-alert');
+            const box = document.getElementById('alert-box');
+            modal.classList.add('opacity-0');
+            box.classList.add('scale-90');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        };
     </script>
 </body>
 </html>
