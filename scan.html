@@ -68,26 +68,42 @@
             </div>
             <h2 id="alert-title" class="font-extrabold text-xl text-[#1f1b11] mb-2">Judul</h2>
             <p id="alert-message" class="text-sm font-medium text-[#7e7760] mb-6">Pesan detail akan muncul di sini.</p>
-            <button onclick="tutupPopup()" class="w-full bg-[#ffd700] text-[#705d00] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all">Mengerti</button>
+            <button id="btn-alert-close" class="w-full bg-[#ffd700] text-[#705d00] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all">Mengerti</button>
         </div>
     </div>
 
-    <script>
-        window.tampilkanPopup = (judul, pesan, tipe = 'info') => {
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE",
+            projectId: "myburjo",
+            appId: "1:25464436577:web:89a3105315f8fbcc703720"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        let fungsiCallbackTutup = null;
+
+        window.tampilkanPopup = (judul, pesan, tipe = 'info', callback = null) => {
             document.getElementById('alert-title').innerText = judul;
             document.getElementById('alert-message').innerText = pesan;
             const icon = document.getElementById('alert-icon');
             const container = document.getElementById('alert-icon-container');
+            fungsiCallbackTutup = callback;
+
             if (tipe === 'sukses') {
                 icon.innerText = 'check_circle';
                 container.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-green-100 text-green-600';
             } else if (tipe === 'error') {
-                icon.innerText = 'warning';
+                icon.innerText = 'sentiment_very_dissatisfied';
                 container.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-red-100 text-red-600';
             } else {
-                icon.innerText = 'location_on';
-                container.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-[#fff9ef] text-[#705d00]';
+                icon.innerText = 'waving_hand';
+                container.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-100 text-blue-600';
             }
+
             const modal = document.getElementById('custom-alert');
             const box = document.getElementById('alert-box');
             modal.classList.remove('hidden');
@@ -106,57 +122,111 @@
             setTimeout(() => {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
+                if (fungsiCallbackTutup) fungsiCallbackTutup();
             }, 300);
         };
-    </script>
 
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    
-    <script>
+        document.getElementById('btn-alert-close').addEventListener('click', tutupPopup);
+
         document.addEventListener("DOMContentLoaded", function() {
-            // Gunakan Html5Qrcode murni (TIDAK PAKAI Scanner) agar UI tidak ditiban
             const html5QrCode = new Html5Qrcode("reader");
             const configKamera = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-            // 1. FUNGSI KAMERA LANGSUNG (Otomatis nyala)
             html5QrCode.start(
-                { facingMode: "environment" }, 
-                configKamera, 
+                { facingMode: "environment" },
+                configKamera,
                 (decodedText) => {
-                    // Jika QR berhasil terscan dari kamera
-                    html5QrCode.stop(); // Matikan kamera biar hemat baterai
-                    tampilkanPopup("Berhasil Scan!", "Data Meja: " + decodedText, "sukses");
-                    
-                    // Nanti logika Check-in Firebase ditaruh di sini
+                    html5QrCode.stop();
+                    prosesDataQR(decodedText);
                 },
-                (errorMessage) => { 
-                    // Abaikan error ini (wajar karena kamera mencari QR tiap milidetik)
+                (errorMessage) => {
+                    // Kamera mencari QR, tidak perlu ditampilkan ke pengguna.
                 }
             ).then(() => {
-                // Kalau kamera sukses nyala, hilangkan ikon loading
                 document.getElementById('loading-cam').style.display = 'none';
             }).catch((err) => {
                 document.getElementById('loading-cam').style.display = 'none';
-                tampilkanPopup("Kamera Diblokir", "Pastikan kamu sudah memberikan izin akses kamera ke browser ini.", "error");
+                tampilkanPopup("Kamera Diblokir", "Mohon berikan izin akses kamera pada browser HP Anda.", "error");
             });
 
-            // 2. FUNGSI UPLOAD GALERI
             document.getElementById('upload-qr').addEventListener('change', e => {
-                if(e.target.files.length === 0) return;
-                
+                if (e.target.files.length === 0) return;
                 const imageFile = e.target.files[0];
                 html5QrCode.scanFile(imageFile, true)
-                .then(decodedText => {
-                    // Jika gambar dari galeri mengandung QR
-                    tampilkanPopup("Berhasil dari Galeri!", "Data QR: " + decodedText, "sukses");
-                })
-                .catch(err => {
-                    tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error");
-                });
-                
-                // Reset input biar pengguna bisa milih foto yang sama lagi kalau mau
-                e.target.value = ""; 
+                    .then(decodedText => {
+                        prosesDataQR(decodedText);
+                    })
+                    .catch(err => {
+                        tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error");
+                    });
+                e.target.value = "";
             });
+
+            async function prosesDataQR(teksQR) {
+                if (!teksQR.startsWith("MYBURJO")) {
+                    tampilkanPopup("QR Tidak Valid", "Kode QR ini bukan milik sistem MyBurjo.", "error", () => location.reload());
+                    return;
+                }
+
+                const bagian = teksQR.split('-');
+                const burjoId = bagian[1];
+                const nomorMeja = parseInt(bagian[3]);
+                const currentUsername = localStorage.getItem("myburjo_username") || "Pengguna";
+
+                if (!burjoId || !nomorMeja) {
+                    tampilkanPopup("Gagal Membaca", "Data QR meja rusak.", "error", () => location.reload());
+                    return;
+                }
+
+                try {
+                    const docRef = doc(db, "penjual", burjoId);
+                    const snap = await getDoc(docRef);
+                    if (!snap.exists()) {
+                        tampilkanPopup("Warung Tidak Ada", "ID Mitra Burjo tidak terdaftar.", "error", () => location.reload());
+                        return;
+                    }
+
+                    const data = snap.data();
+                    let mejaAktif = data.meja_aktif || [];
+                    let detailMeja = data.detail_meja || [];
+                    const infoMeja = detailMeja.find(item => item.nomor === nomorMeja);
+                    const indexMejaTerpakai = mejaAktif.indexOf(nomorMeja);
+
+                    if (indexMejaTerpakai > -1) {
+                        if (infoMeja && infoMeja.user === currentUsername) {
+                            mejaAktif = mejaAktif.filter(n => n !== nomorMeja);
+                            detailMeja = detailMeja.filter(d => d.nomor !== nomorMeja);
+                            await updateDoc(docRef, {
+                                meja_aktif: mejaAktif,
+                                detail_meja: detailMeja,
+                                status_meja: mejaAktif.length.toString()
+                            });
+                            tampilkanPopup("Check-out Berhasil", "Terima kasih, kamu sudah keluar dari meja.", "info", () => {
+                                window.location.href = "index.html";
+                            });
+                        } else {
+                            tampilkanPopup("Meja Sedang Dipakai", "Meja ini sudah dipesan oleh pengguna lain.", "error", () => {
+                                window.location.href = "index.html";
+                            });
+                        }
+                    } else {
+                        mejaAktif.push(nomorMeja);
+                        detailMeja = detailMeja.filter(d => d.nomor !== nomorMeja);
+                        detailMeja.push({ nomor: nomorMeja, user: currentUsername });
+                        await updateDoc(docRef, {
+                            meja_aktif: mejaAktif,
+                            detail_meja: detailMeja,
+                            status_meja: mejaAktif.length.toString()
+                        });
+                        tampilkanPopup("Check-in Berhasil", "Selamat! Kamu berhasil check-in.", "sukses", () => {
+                            window.location.href = "index.html";
+                        });
+                    }
+                } catch (error) {
+                    console.error(error);
+                    tampilkanPopup("Error Sistem", "Gagal berkomunikasi dengan database.", "error", () => location.reload());
+                }
+            }
         });
     </script>
 </body>
