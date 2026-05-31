@@ -11,13 +11,62 @@
         body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #fff9ef; color: #1f1b11; }
         h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; }
         .ambient-shadow { box-shadow: 0 4px 20px rgba(31, 27, 17, 0.08); }
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* DEFAULT (Untuk HP/Mobile): Sembunyikan semua scrollbar visual */
+        .desktop-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .desktop-scroll::-webkit-scrollbar { display: none; }
+        
+        /* KHUSUS LAPTOP/DESKTOP (Layar 1024px ke atas): Tampilkan scrollbar kustom yang rapi */
+        @media (min-width: 1024px) {
+            .desktop-scroll { 
+                scrollbar-width: thin !important; 
+                scrollbar-color: #ffd700 #fff9ef !important; 
+            }
+            .desktop-scroll::-webkit-scrollbar { 
+                display: block !important; 
+                height: 6px !important; 
+            }
+            .desktop-scroll::-webkit-scrollbar-track { 
+                background: #fff9ef !important; 
+                border-radius: 10px;
+            }
+            .desktop-scroll::-webkit-scrollbar-thumb { 
+                background: #ffd700 !important; 
+                border-radius: 10px;
+            }
+            .desktop-scroll::-webkit-scrollbar-thumb:hover { 
+                background: #705d00 !important; 
+            }
+        }
+        
         .nav-active { color: #705d00 !important; font-weight: 800; }
     </style>
 </head>
 <body class="antialiased pb-40">
     
+    <div id="modal-notif-kustom" class="fixed inset-0 bg-[#1f1b11]/80 z-[200] hidden items-center justify-center px-6 backdrop-blur-sm transition-all duration-300">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 flex flex-col ambient-shadow scale-100 transition-transform duration-300">
+            <div class="flex items-center gap-3 text-red-600 mb-3">
+                <span id="modal-ikon" class="material-symbols-outlined text-3xl">warning</span>
+                <h2 id="modal-judul" class="font-extrabold text-xl leading-tight">Konfirmasi</h2>
+            </div>
+            <p id="modal-pesan" class="text-xs font-semibold text-[#7e7760] mb-6 whitespace-pre-line leading-relaxed">Pesan notifikasi.</p>
+            
+            <div id="modal-wrapper-pin" class="hidden w-full mb-6">
+                <label class="block text-[10px] font-black text-[#7e7760] uppercase mb-2 tracking-wider">Masukkan 4-Digit PIN Warung</label>
+                <input type="password" id="modal-input-pin" maxlength="4" placeholder="••••" class="w-full bg-[#fff9ef] border-2 border-[#f5eddb] focus:border-[#ffd700] rounded-2xl p-4 text-center text-xl font-black tracking-[1em] focus:outline-none transition-all text-[#1f1b11]">
+            </div>
+
+            <div class="flex gap-3 w-full">
+                <button id="modal-btn-batal" class="flex-1 bg-[#fff9ef] text-[#1f1b11] py-3 rounded-xl font-bold border border-[#f5eddb] active:scale-95 transition-all text-xs">
+                    Batal
+                </button>
+                <button id="modal-btn-lanjut" class="flex-[1.5] bg-red-600 text-white py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-xs">
+                    Lanjutkan
+                </button>
+            </div>
+        </div>
+    </div>
     <header class="bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-[#f5eddb] shadow-sm">
     <div id="header-profile-trigger" class="flex items-center gap-4 cursor-pointer active:opacity-70 transition-all">
         <div id="logo-container" class="w-12 h-12 rounded-full bg-[#ffd700] flex items-center justify-center border-2 border-[#1f1b11] overflow-hidden">
@@ -39,7 +88,10 @@
                 <h2 class="font-bold text-lg text-[#1f1b11]">Status Meja Aktif</h2>
                 <span id="indikator-jumlah" class="px-3 py-1 bg-[#fff9ef] text-[#705d00] rounded-full text-[10px] font-black border border-[#f5eddb]">0/10 TERPAKAI</span>
             </div>
-            <div id="container-meja" class="flex gap-4 overflow-x-auto hide-scroll pb-2 snap-x"></div>
+            <!-- Menggunakan class desktop-scroll dengan aturan responsif yang baru -->
+            <div class="w-full overflow-x-auto overflow-y-hidden desktop-scroll pb-3">
+                <div id="container-meja" class="flex gap-4 snap-x pr-6 min-w-max items-center"></div>
+            </div>
         </section>
 
         <section>
@@ -99,21 +151,19 @@
         const burjoId = urlParams.get('id') || "12052601"; 
         const docRef = doc(db, "penjual", burjoId);
 
-        // Update Link Navigasi agar membawa ID
         document.getElementById('nav-katalog-meja').href = `laman-utama-penjual.html?id=${burjoId}`;
         document.getElementById('nav-katalog-menu').href = `edit-katalog-menu.html?id=${burjoId}`;
         document.getElementById('link-edit-meja').href = `edit-katalog-meja.html?id=${burjoId}`;
         document.getElementById('header-profile-trigger').onclick = () => window.location.href = `profile-penjual.html?id=${burjoId}`;
 
-        // Perbaikan: Deklarasikan variabel state di atas sebelum dipanggil di onSnapshot
         let listMejaTerpakai = [];
         let listDetailMeja = []; 
-        let dataBurjoSekarang = null; // <-- INI YANG TADI HILANG DAN MEMBUAT ERROR
+        let dataBurjoSekarang = null; 
 
         onSnapshot(docRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
-                dataBurjoSekarang = data; // Sekarang ini berjalan aman tanpa error
+                dataBurjoSekarang = data; 
                 document.getElementById('nama-toko').innerText = data.nama_burjo;
                 document.getElementById('display-id').innerText = burjoId;
 
@@ -132,7 +182,7 @@
 
         function renderMeja(listTerpakai, detailUser, deskripsiMeja) {
             const container = document.getElementById('container-meja');
-            const simpanScrollX = container.scrollLeft;
+            const simpanScrollX = container.parentElement.scrollLeft;
             const simpanScrollY = window.scrollY;
 
             container.style.minHeight = `${container.offsetHeight}px`;
@@ -141,18 +191,19 @@
             document.getElementById('indikator-jumlah').innerText = `${listTerpakai.length}/${totalMeja} TERPAKAI`;
             container.innerHTML = "";
             for (let i = 1; i <= totalMeja; i++) {
-                const isTerpakai = listTerpakai.includes(i);
-                const dataUser = detailUser.find(d => d.nomor == i);
+                const isTerpakai = listTerpakai.map(n => parseInt(n)).includes(i);
+                const dataUser = detailUser.find(d => parseInt(d.nomor) === i);
                 const username = isTerpakai ? (dataUser?.user || "Pelanggan") : "-";
+                
                 container.innerHTML += `
-                    <div class="min-w-[150px] snap-center p-5 rounded-2xl border-2 ${isTerpakai ? 'border-[#f5eddb] bg-[#f5eddb]' : 'border-[#ffd700] bg-white'} flex flex-col items-center shadow-sm">
-                        <span class="text-[10px] font-bold text-[#7e7760] mb-1 tracking-wider uppercase font-black">Meja ${i.toString().padStart(2, '0')}</span>
+                    <div class="min-w-[150px] w-[150px] snap-center p-5 rounded-2xl border-2 ${isTerpakai ? 'border-[#f5eddb] bg-[#f5eddb]' : 'border-[#ffd700] bg-white'} flex flex-col items-center shadow-sm select-none">
+                        <span class="text-[10px] font-black text-[#7e7760] mb-1 tracking-wider uppercase" style="font-family: 'Plus Jakarta Sans', sans-serif;">Meja ${i.toString().padStart(2, '0')}</span>
                         <div class="h-10 flex items-center justify-center text-center mb-2">
-                            <p class="text-[11px] font-black text-[#1f1b11]">
-                                ${isTerpakai ? '<span class="material-symbols-outlined text-[14px] align-middle mr-1">person</span>' + username : '<span class="text-[#d1c8b4]">Kosong</span>'}
+                            <p class="text-[11px] font-semibold text-[#1f1b11] break-words max-w-[120px] leading-tight">
+                                ${isTerpakai ? '<span class="material-symbols-outlined text-[14px] align-middle mr-1">person</span>' + username : '<span class="text-[#d1c8b4] font-normal">Kosong</span>'}
                             </p>
                         </div>
-                        <div class="px-3 py-1 rounded-full text-[8px] font-black mb-4 uppercase ${isTerpakai ? 'bg-[#705d00] text-white' : 'bg-[#1f1b11] text-[#ffd700]'}">
+                        <div class="px-3 py-1 rounded-full text-[8px] font-black mb-4 uppercase tracking-wider" style="font-family: 'Plus Jakarta Sans', sans-serif; ${isTerpakai ? 'background-color: #705d00; color: white;' : 'background-color: #1f1b11; color: #ffd700;'}">
                             ${isTerpakai ? 'Terpakai' : 'Tersedia'}
                         </div>
                         <button onclick="prosesMeja(${i}, '${isTerpakai ? 'lepas' : 'isi'}')" class="w-full py-2 rounded-xl text-[10px] font-bold active:scale-95 transition-all ${isTerpakai ? 'bg-white text-[#dc2626] border border-[#dc2626]' : 'bg-[#ffd700] text-[#1f1b11]'}">
@@ -161,23 +212,23 @@
                     </div>`;
             }
 
-            container.scrollLeft = simpanScrollX;
+            container.parentElement.scrollLeft = simpanScrollX;
             window.scrollTo(window.scrollX, simpanScrollY);
             container.style.minHeight = "";
         }
 
         window.prosesMeja = async (nomor, aksi) => {
-            let newList = [...listMejaTerpakai];
+            let newList = [...listMejaTerpakai].map(n => parseInt(n));
             let newDetail = [...listDetailMeja];
             const nomorAngka = parseInt(nomor);
 
             if (aksi === 'lepas') {
-                newList = newList.filter(n => parseInt(n) !== nomorAngka);
+                newList = newList.filter(n => n !== nomorAngka);
                 newDetail = newDetail.filter(d => parseInt(d.nomor) !== nomorAngka);
             } else if (aksi === 'isi') {
-                if (!newList.map(n => parseInt(n)).includes(nomorAngka)) {
+                if (!newList.includes(nomorAngka)) {
                     newList.push(nomorAngka);
-                    newDetail.push({ nomor: nomorAngka, user: "Pelanggan (Manual)" });
+                    newDetail.push({ nomor: nomorAngka, user: "Pelanggan<br>(Manual)" });
                 }
             }
 
@@ -188,32 +239,107 @@
             });
         };
 
-        // FUNGSI AKSI MENGHAPUS BURJO DARI DATABASE
+        // =============================================================================
+        // ENGINE MODAL NOTIFIKASI KUSTOM TENGAH LAYAR
+        // =============================================================================
+        const modalEl = document.getElementById('modal-notif-kustom');
+        const modalJudul = document.getElementById('modal-judul');
+        const modalPesan = document.getElementById('modal-pesan');
+        const modalIkon = document.getElementById('modal-ikon');
+        const wrapperPin = document.getElementById('modal-wrapper-pin');
+        const inputPin = document.getElementById('modal-input-pin');
+        const btnBatal = document.getElementById('modal-btn-batal');
+        const btnLanjut = document.getElementById('modal-btn-lanjut');
+
+        function panggilModalKustom({ judul, pesan, ikon = "warning", butuhPin = false, hanyaOk = false }) {
+            return new Promise((resolve) => {
+                modalJudul.innerText = judul;
+                modalPesan.innerText = pesan;
+                modalIkon.innerText = ikon;
+                inputPin.value = "";
+
+                if (butuhPin) {
+                    wrapperPin.classList.remove('hidden');
+                } else {
+                    wrapperPin.classList.add('hidden');
+                }
+
+                if (hanyaOk) {
+                    btnBatal.classList.add('hidden');
+                    btnLanjut.innerText = "Selesai";
+                    btnLanjut.className = "flex-1 bg-[#1f1b11] text-[#ffd700] py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-xs text-center";
+                } else {
+                    btnBatal.classList.remove('hidden');
+                    btnLanjut.innerText = "Lanjutkan";
+                    btnLanjut.className = "flex-[1.5] bg-red-600 text-white py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-xs";
+                }
+
+                modalEl.classList.remove('hidden');
+                modalEl.classList.add('flex');
+
+                btnBatal.onclick = () => {
+                    modalEl.classList.replace('flex', 'hidden');
+                    resolve({ hasil: false, value: "" });
+                };
+
+                btnLanjut.onclick = () => {
+                    modalEl.classList.replace('flex', 'hidden');
+                    resolve({ hasil: true, value: inputPin.value });
+                };
+            });
+        }
+
         window.pemicuHapusBurjo = async () => {
-            if (!dataBurjoSekarang) return alert("Data belum termuat sepenuhnya.");
+            if (!dataBurjoSekarang) {
+                await panggilModalKustom({ judul: "Kesalahan", pesan: "Data belum termuat sepenuhnya.", ikon: "error", hanyaOk: true });
+                return;
+            }
 
-            const konfirmasiPertama = confirm(`Apakah Anda yakin ingin menghapus "${dataBurjoSekarang.nama_burjo}"?\nTindakan ini tidak dapat dibatalkan.`);
-            if (!konfirmasiPertama) return;
+            const tahap1 = await panggilModalKustom({
+                judul: "Hapus Warung Burjo?",
+                pesan: `Apakah Anda yakin ingin menghapus "${dataBurjoSekarang.nama_burjo}"?\nTindakan ini tidak dapat dibatalkan.`,
+                ikon: "warning"
+            });
+            if (!tahap1.hasil) return;
 
-            const inputPin = prompt("Untuk keamanan, silakan masukkan 4 digit PIN warung Anda:");
-            if (inputPin === null) return; 
+            const tahap2 = await panggilModalKustom({
+                judul: "Keamanan Ganda",
+                pesan: "Silakan masukkan 4 digit PIN warung Anda untuk memvalidasi kepemilikan:",
+                ikon: "lock",
+                butuhPin: true
+            });
+            if (!tahap2.hasil || tahap2.value === "") return;
 
             const pinBenar = dataBurjoSekarang.pin ? dataBurjoSekarang.pin.toString() : "";
             
-            if (inputPin === pinBenar) {
-                const konfirmasiFinal = confirm("Peringatan Terakhir! Klik 'OK' untuk menghapus permanen.");
-                if (!konfirmasiFinal) return;
+            if (tahap2.value === pinBenar) {
+                const tahap3 = await panggilModalKustom({
+                    judul: "Peringatan Terakhir!",
+                    pesan: "Sistem akan menghapus seluruh data katalog menu, status meja, dan profil dari database secara permanen.",
+                    ikon: "gavel"
+                });
+                if (!tahap3.hasil) return;
 
                 try {
                     await deleteDoc(docRef);
-                    alert("Warung Burjo Anda berhasil dihapus dari sistem.");
+                    await panggilModalKustom({
+                        judul: "Berhasil Dihapus",
+                        pesan: "Warung Burjo Anda berhasil dihapus sepenuhnya dari sistem MYBURJO.",
+                        ikon: "check_circle",
+                        hanyaOk: true
+                    });
                     localStorage.removeItem("myburjo_penjual_id");
                     window.location.href = "login-penjual.html";
                 } catch (error) {
-                    alert("Gagal menghapus data: " + error.message);
+                    await panggilModalKustom({ judul: "Gagal Menghapus", pesan: error.message, ikon: "error", hanyaOk: true });
                 }
             } else {
-                alert("PIN Keamanan salah! Proses penghapusan digagalkan.");
+                await panggilModalKustom({
+                    judul: "Akses Ditolak",
+                    pesan: "PIN Keamanan yang Anda masukkan salah! Proses penghapusan langsung digagalkan.",
+                    ikon: "cancel",
+                    hanyaOk: true
+                });
             }
         };
     </script>
