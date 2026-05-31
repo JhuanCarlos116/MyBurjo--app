@@ -86,7 +86,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        // Tambahan collection dan getDocs untuk memproses pembacaan jumlah data dokumen terdaftar
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = { 
             apiKey: "AIzaSyCLmFSnIL4NJrRqqyQ6TYZGL4TKGzIXfjE", 
@@ -142,7 +143,6 @@
             document.getElementById('step-daftar').classList.remove('hidden');
             document.getElementById('status-label').innerText = "Kemitraan Baru";
             
-            // Mengambil lokasi otomatis jika diizinkan browser (Opsional, mempermudah pengguna)
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
                     document.getElementById('reg-lat').value = position.coords.latitude;
@@ -166,30 +166,49 @@
             btnReg.innerText = "Mendaftarkan Mitra...";
             btnReg.disabled = true;
 
-            // Generate acak 8-digit ID unik numerik
-            const generatedId = Math.floor(10000000 + Math.random() * 90000000).toString();
-
-            // Setup data array struktur default 10 meja untuk Burjo baru
-            const deskripsiMejaDefault = [];
-            for(let i = 1; i <= 10; i++) {
-                deskripsiMejaDefault.push(`Meja ${i}: Muat 4 Orang, Fasilitas Standar Burjo`);
-            }
-
-            const payloadBurjoBaru = {
-                nama_burjo: namaBurjo,
-                pin: pinBaru,
-                totalMeja: 10,
-                meja_aktif: [], // Tidak ada meja terpakai di awal
-                listMejaTerpakai: [],
-                deskripsi_meja: deskripsiMejaDefault,
-                lokasi: {
-                    latitude: parseFloat(latVal),
-                    longitude: parseFloat(lngVal)
-                }
-            };
-
             try {
-                // Simpan data burjo baru ke Firestore
+                // 1. Dapatkan format tanggal hari ini (DDMMYY) berbasis waktu lokal
+                const sekarang = new Date();
+                const dd = String(sekarang.getDate()).padStart(2, '0');
+                const mm = String(sekarang.getMonth() + 1).padStart(2, '0'); 
+                const yy = String(sekarang.getFullYear()).slice(-2); 
+                const prefiksTanggal = `${dd}${mm}${yy}`; 
+
+                // 2. Scan data dokumen penjual yang ada untuk menghitung urutan antrean hari ini
+                const querySnapshot = await getDocs(collection(db, "penjual"));
+                let urutanHariIni = 1;
+
+                querySnapshot.forEach((doc) => {
+                    // Jika ID dokumen berawalan sama dengan tanggal hari ini, tambahkan counter urutan
+                    if (doc.id.startsWith(prefiksTanggal)) {
+                        urutanHariIni++;
+                    }
+                });
+
+                // 3. Format urutan menjadi 2 digit string (contoh: 1 menjadi "01", 11 tetap "11")
+                const duaDigitUrutan = String(urutanHariIni).padStart(2, '0');
+                const generatedId = `${prefiksTanggal}${duaDigitUrutan}`; 
+
+                // Setup data array struktur default 10 meja untuk Burjo baru
+                const deskripsiMejaDefault = [];
+                for(let i = 1; i <= 10; i++) {
+                    deskripsiMejaDefault.push(`Meja ${i}: Muat 4 Orang, Fasilitas Standar Burjo`);
+                }
+
+                const payloadBurjoBaru = {
+                    nama_burjo: namaBurjo,
+                    pin: pinBaru,
+                    totalMeja: 10,
+                    meja_aktif: [], 
+                    listMejaTerpakai: [],
+                    deskripsi_meja: deskripsiMejaDefault,
+                    lokasi: {
+                        latitude: parseFloat(latVal),
+                        longitude: parseFloat(lngVal)
+                    }
+                };
+
+                // Simpan data burjo baru ke Firestore menggunakan ID terformat tanggal & urutan
                 await setDoc(doc(db, "penjual", generatedId), payloadBurjoBaru);
                 
                 alert(`Pendaftaran Berhasil!\n\nID PENJUAL ANDA: ${generatedId}\n(Harap catat ID ini baik-baik untuk masuk ke aplikasi)`);

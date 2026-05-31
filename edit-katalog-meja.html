@@ -46,7 +46,7 @@
 
     <header
         class="bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-[#f5eddb] shadow-sm">
-        <button onclick="window.location.href='laman-utama-penjual.html'"
+        <button onclick="kembaliKeUtama()"
             class="w-10 h-10 flex items-center justify-center rounded-xl bg-[#fff9ef] text-[#1f1b11] active:scale-95 transition-all">
             <span class="material-symbols-outlined">arrow_back</span>
         </button>
@@ -120,6 +120,11 @@
         let currentQrUrl = "";
         let currentMejaNomor = "";
 
+        // PERBAIKAN: Fungsi global baru untuk menangani perpindahan halaman kembali dengan parameter ID mitra yang tepat
+        window.kembaliKeUtama = () => {
+            window.location.href = `laman-utama-penjual.html?id=${burjoId}`;
+        };
+
         // Inisialisasi Laman
         async function loadKatalog() {
             try {
@@ -191,7 +196,6 @@
                 deskripsi: ""
             });
             renderKatalog();
-            // Scroll ke bawah agar meja baru terlihat
             setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
         };
 
@@ -200,7 +204,6 @@
             const konfirmasi = confirm(`Apakah kamu yakin ingin menghapus Meja ${dataMeja[index].nomor}?`);
             if (konfirmasi) {
                 dataMeja.splice(index, 1);
-                // Urutkan ulang nomor meja agar tetap sekuensial
                 dataMeja.forEach((m, i) => m.nomor = i + 1);
                 renderKatalog();
             }
@@ -213,7 +216,6 @@
             btn.classList.add("opacity-50", "pointer-events-none");
 
             try {
-                // Kembalikan ke format array of string sesuai struktur aslinya
                 const finalArray = dataMeja.map(m => `Meja ${m.nomor}: ${m.deskripsi}`);
 
                 await updateDoc(docRef, {
@@ -238,10 +240,8 @@
             currentMejaNomor = nomor.toString().padStart(2, '0');
             document.getElementById('qr-subtitle').innerText = `Meja ${currentMejaNomor}`;
 
-            // PERBAIKAN: Gunakan currentMejaNomor agar menghasilkan format '01' bukan '1'
             const qrData = `MYBURJO-${burjoId}-MEJA-${currentMejaNomor}`;
 
-            // Resolusi dibesarkan jadi 500x500 agar bagus saat diprint
             currentQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrData)}`;
             document.getElementById('qr-image').src = currentQrUrl;
 
@@ -265,11 +265,9 @@
             btn.innerHTML = `<span class="material-symbols-outlined text-lg animate-spin">sync</span> Menyimpan...`;
 
             try {
-                // Fetch image as blob
                 const response = await fetch(currentQrUrl);
                 const blob = await response.blob();
 
-                // Create object URL and trigger download
                 const blobUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
@@ -277,12 +275,10 @@
                 document.body.appendChild(a);
                 a.click();
 
-                // Cleanup
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(blobUrl);
             } catch (error) {
                 console.error("Gagal mendownload QR:", error);
-                // Fallback jika fetch terblokir oleh browser pengguna
                 window.open(currentQrUrl, '_blank');
             } finally {
                 btn.innerHTML = originalHTML;
