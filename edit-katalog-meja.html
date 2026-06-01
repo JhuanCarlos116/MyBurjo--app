@@ -240,10 +240,17 @@
             currentMejaNomor = nomor.toString().padStart(2, '0');
             document.getElementById('qr-subtitle').innerText = `Meja ${currentMejaNomor}`;
 
+            // FORMAT DATA YANG DIGENERATE UNTUK SCANNER
             const qrData = `MYBURJO-${burjoId}-MEJA-${currentMejaNomor}`;
-
-            currentQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrData)}`;
-            document.getElementById('qr-image').src = currentQrUrl;
+            
+            // PERBAIKAN PENTING: Tambahkan margin (Qzone) dari API agar scanner bisa mendeteksinya
+            // Parameter margin=4 memberikan batas putih yang dibutuhkan scanner
+            currentQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=4&data=${encodeURIComponent(qrData)}`;
+            
+            // Paksa image untuk tidak terpotong
+            const imgQr = document.getElementById('qr-image');
+            imgQr.style.objectFit = "contain";
+            imgQr.src = currentQrUrl;
 
             modalQr.classList.remove('hidden');
             modalQr.classList.add('flex');
