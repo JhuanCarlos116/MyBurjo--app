@@ -86,7 +86,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // KUNCI UTAMA: Flag pengunci agar tidak melakukan ganda scan
         let isProcessing = false; 
 
         window.tampilkanPopup = (judul, pesan, tipe = 'info') => {
@@ -127,8 +126,6 @@
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
                 
-                // PERBAIKAN 2: Berikan jeda Cooldown 2 Detik.
-                // Ini memberi kamu waktu untuk menggeser HP dari QR code setelah pop-up tertutup.
                 setTimeout(() => {
                     isProcessing = false; 
                 }, 2000);
@@ -137,87 +134,72 @@
 
         document.getElementById('btn-alert-close').addEventListener('click', tutupPopup);
 
-        // --- PEMBACAAN HARDWARE KAMERA ---
-        document.addEventListener("DOMContentLoaded", function() {
-            const html5QrCode = new Html5Qrcode("reader");
-            const configKamera = { fps: 10, qrbox: { width: 250, height: 250 } };
+        // --- PEMBACAAN HARDWARE KAMERA (Dikeluarkan dari DOMContentLoaded) ---
+        const html5QrCode = new Html5Qrcode("reader");
+        const configKamera = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                configKamera, 
-                (decodedText) => {
-                    if (isProcessing) return; 
-                    isProcessing = true; // Kunci sistem scan seketika
-                    prosesDataQR(decodedText);
-                },
-                (errorMessage) => { /* scanning framework... */ }
-            ).then(() => {
-                document.getElementById('loading-cam').style.display = 'none';
-            }).catch((err) => {
-                document.getElementById('loading-cam').style.display = 'none';
-                tampilkanPopup("Kamera Diblokir", "Mohon berikan izin akses kamera pada pengaturan browser HP Anda.", "error");
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            configKamera, 
+            (decodedText) => {
+                if (isProcessing) return; 
+                isProcessing = true; 
+                prosesDataQR(decodedText);
+            },
+            (errorMessage) => { /* error bawaan library saat mencari fokus diabaikan */ }
+        ).then(() => {
+            document.getElementById('loading-cam').style.display = 'none';
+        }).catch((err) => {
+            document.getElementById('loading-cam').style.display = 'none';
+            // Tambahan info HTTPS agar user paham syarat akses kamera
+            tampilkanPopup("Kamera Diblokir", "Mohon berikan izin akses kamera. Pastikan juga Anda membuka situs ini menggunakan HTTPS atau localhost.", "error");
+        });
+
+        // INPUT VIA GALERI FOTO
+        document.getElementById('upload-qr').addEventListener('change', e => {
+            if(e.target.files.length === 0 || isProcessing) return;
+            isProcessing = true;
+            
+            const imageFile = e.target.files[0];
+            html5QrCode.scanFile(imageFile, true)
+            .then(decodedText => {
+                prosesDataQR(decodedText);
+            })
+            .catch(err => {
+                tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error");
+                isProcessing = false; 
             });
+            e.target.value = ""; 
+        });
 
-            // INPUT VIA GALERI FOTO
-            document.getElementById('upload-qr').addEventListener('change', e => {
-                if(e.target.files.length === 0 || isProcessing) return;
-                isProcessing = true;
-                
-                const imageFile = e.target.files[0];
-                html5QrCode.scanFile(imageFile, true)
-                .then(decodedText => {
-                    prosesDataQR(decodedText);
-                })
-                .catch(err => {
-                    tampilkanPopup("Gagal Membaca", "Tidak ditemukan kode QR pada foto yang kamu pilih.", "error");
-                    isProcessing = false; // Buka kunci jika error baca gambar
-                });
-                e.target.value = ""; 
-            });
+        // MANAJEMEN DATABASE KONDISI REALTIME
+        async function prosesDataQR(teksQR) {
+            if (!teksQR.startsWith("MYBURJO")) {
+                tampilkanPopup("QR Tidak Valid", "Kode QR ini bukan milik sistem aplikasi MYBURJO.", "error");
+                return;
+            }
 
-            // MANAJEMEN DATABASE KONDISI REALTIME
-            async function prosesDataQR(teksQR) {
-                if (!teksQR.startsWith("MYBURJO")) {
-                    tampilkanPopup("QR Tidak Valid", "Kode QR ini bukan milik sistem aplikasi MYBURJO.", "error");
-                    return;
-                }
+            const bagian = teksQR.split('-');
+            const burjoId = bagian[1]; 
+            const nomorMeja = parseInt(bagian[3]); 
+            const currentUsername = localStorage.getItem("myburjo_username") || "Ayam jago";
 
-                const bagian = teksQR.split('-');
-                const burjoId = bagian[1]; 
-                const nomorMeja = parseInt(bagian[3]); 
-                const currentUsername = localStorage.getItem("myburjo_username") || "Ayam jago";
+            try {
+                const docRef = doc(db, "penjual", burjoId);
+                const snap = await getDoc(docRef);
 
-                try {
-                    const docRef = doc(db, "penjual", burjoId);
-                    const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    let mejaAktif = data.meja_aktif || [];
+                    let detailMeja = data.detail_meja || [];
 
-                    if (snap.exists()) {
-                        const data = snap.data();
-                        let mejaAktif = data.meja_aktif || [];
-                        let detailMeja = data.detail_meja || [];
+                    const indexMejaTerpakai = mejaAktif.indexOf(nomorMeja);
+                    const infoUserDiMeja = detailMeja.find(d => d.nomor == nomorMeja);
 
-                        const indexMejaTerpakai = mejaAktif.indexOf(nomorMeja);
-                        const infoUserDiMeja = detailMeja.find(d => d.nomor == nomorMeja);
-
-                        if (indexMejaTerpakai > -1) {
-                            if (infoUserDiMeja && infoUserDiMeja.user === currentUsername) {
-                                mejaAktif = mejaAktif.filter(n => n !== nomorMeja);
-                                detailMeja = detailMeja.filter(d => d.nomor != nomorMeja);
-
-                                await updateDoc(docRef, {
-                                    meja_aktif: mejaAktif,
-                                    detail_meja: detailMeja,
-                                    status_meja: mejaAktif.length.toString()
-                                });
-
-                                tampilkanPopup("Dadah!", "Berhasil Check-out. Meja sudah dikosongkan.", "info");
-                            } else {
-                                tampilkanPopup("Yah!", "Mejanya masih dipake sama orang lain.", "error");
-                            }
-                        } else {
-                            mejaAktif.push(nomorMeja);
+                    if (indexMejaTerpakai > -1) {
+                        if (infoUserDiMeja && infoUserDiMeja.user === currentUsername) {
+                            mejaAktif = mejaAktif.filter(n => n !== nomorMeja);
                             detailMeja = detailMeja.filter(d => d.nomor != nomorMeja);
-                            detailMeja.push({ nomor: nomorMeja, user: currentUsername });
 
                             await updateDoc(docRef, {
                                 meja_aktif: mejaAktif,
@@ -225,16 +207,30 @@
                                 status_meja: mejaAktif.length.toString()
                             });
 
-                            tampilkanPopup("Yeay!", "Berhasil Check-in. Selamat menikmati pesananmu!", "sukses");
+                            tampilkanPopup("Dadah!", "Berhasil Check-out. Meja sudah dikosongkan.", "info");
+                        } else {
+                            tampilkanPopup("Yah!", "Mejanya masih dipake sama orang lain.", "error");
                         }
                     } else {
-                        tampilkanPopup("Warung Tidak Ada", "ID Mitra Burjo tidak terdaftar.", "error");
+                        mejaAktif.push(nomorMeja);
+                        detailMeja = detailMeja.filter(d => d.nomor != nomorMeja);
+                        detailMeja.push({ nomor: nomorMeja, user: currentUsername });
+
+                        await updateDoc(docRef, {
+                            meja_aktif: mejaAktif,
+                            detail_meja: detailMeja,
+                            status_meja: mejaAktif.length.toString()
+                        });
+
+                        tampilkanPopup("Yeay!", "Berhasil Check-in. Selamat menikmati pesananmu!", "sukses");
                     }
-                } catch (error) {
-                    tampilkanPopup("Error Sistem", "Gagal terkoneksi: " + error.message, "error");
+                } else {
+                    tampilkanPopup("Warung Tidak Ada", "ID Mitra Burjo tidak terdaftar.", "error");
                 }
+            } catch (error) {
+                tampilkanPopup("Error Sistem", "Gagal terkoneksi: " + error.message, "error");
             }
-        });
+        }
     </script>
 </body>
 </html>
